@@ -28,7 +28,7 @@ const META_OBJ = {
     labelToKey: LABEL_TO_KEY,
 };
 
-function headersToString(headers: HeaderNode, level: number): string {
+function headersToString(headers: HeaderNode, level: number = 0): string {
     let r = '';
     if ('label' in headers || 'key' in headers) {
         r += '--'.repeat(level);
@@ -49,41 +49,33 @@ function headersToString(headers: HeaderNode, level: number): string {
     return r;
 }
 
-function headerKeysToString(headers: HeaderNode, level: number): string {
-    let r = '';
-    if ('key' in headers) {
-        const k = Array.isArray(headers.key) ? `${headers.key[0]}[${headers.key[1]}]`
-                                             : String(headers.key);
-        r += '>>'.repeat(level) + k + '\n';
-        level++;
-    }
-    for (const c of headers.children) {
-        r += headerKeysToString(c, level);
-    }
-    return r;
-}
-
 class Book {
-    get [META]() { return META_OBJ };
+    static Table = sheetable(Book);
 
+    @label('Title')
     title: string = '';
+
+    @label('ISBN')
     isbn: string = '';
+    
+    @label(['Author 1', 'Author 2', 'Author 3'])
     authors: Person[] = [new Person(), new Person(), new Person()];
+    
+    @label('Date')
     date: Date = new Date();
 }
 
-class Person {
-    get [META]() { return META_OBJ };
-
+class Person {    
+    @label('First Name')
     firstName: string = '';
+    
+    @label('Last Name')
     lastName: string = '';
 }
 
 function test01a() {
-    const BookTable = new Sheetable(Book, );
-    
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const { sheet } = BookTable.create(spreadsheet);
+    const { sheet } = new Book.Table(spreadsheet);
 
     const ui = SpreadsheetApp.getUi();
     const headers = readHeaders(TableWalker.fromSheet(sheet), new Book(), ui);
@@ -102,8 +94,7 @@ Jane Eyre             | Charlotte  | Brontë       | 1847
 The Great Gatsby      | F. Scott   | Fitzgerald   | 1925
 `
     );
-    const headers = readHeaders(TableWalker.fromSheet(sheet), new Book(), ui);
-    if (headers)
-        ui.alert(headersToString(headers, 0));
+    const table = new Book.Table(sheet);
+    ui.alert(headersToString(table.headers, 0));
 
 }

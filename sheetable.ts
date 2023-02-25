@@ -1,12 +1,101 @@
 type Sheet = GoogleAppsScript.Spreadsheet.Sheet;
 type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
 
+function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
+    return class Table {
+        readonly sheet: Sheet;
+        readonly orientation: Orientation;
+        private headers: HeaderNode;
+    
+        constructor(spreadSheet: Spreadsheet, data?: T[]);
+        constructor(sheet: Sheet);
+        constructor(doc: Spreadsheet | Sheet, data?: T[]) {
+            let sheet: Sheet;
+            if ('insertSheet' in doc) {
+                sheet = doc.insertSheet();
+                const specimen = data?.[0] ?? new Constructor();
+                this.headers = createHeaders(specimen, 1, 1);
+                writeHeaders(this.headers, sheet);
+            } else {
+                sheet = doc;
+                const headers = readHeaders(TableWalker.fromSheet(sheet), new Constructor());
+                if (!headers)
+                    throw new Error('Error reading table headers.');
+                this.headers = headers;
+            }
+            this.sheet = sheet;
+            this.orientation = getOrientation(sheet);
+        }
+    };
+}
+
+// function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
+//     return class extends Constructor {
+//         static Table = class Table {
+//             readonly sheet: Sheet;
+//             readonly orientation: Orientation;
+//             private headers: HeaderNode;
+        
+//             constructor(spreadSheet: Spreadsheet, data?: T[]);
+//             constructor(sheet: Sheet);
+//             constructor(doc: Spreadsheet | Sheet, data?: T[]) {
+//                 let sheet: Sheet;
+//                 if ('insertSheet' in doc) {
+//                     sheet = doc.insertSheet();
+//                     const specimen = data?.[0] ?? new Constructor();
+//                     this.headers = createHeaders(specimen, 1, 1);
+//                     writeHeaders(this.headers, sheet);
+//                 } else {
+//                     sheet = doc;
+//                     const headers = readHeaders(TableWalker.fromSheet(sheet), new Book());
+//                     if (!headers)
+//                         throw new Error('Error reading table headers.');
+//                     this.headers = headers;
+//                 }
+//                 this.sheet = sheet;
+//                 this.orientation = getOrientation(sheet);
+//             }
+//         };
+//     };
+// }
+
+function label(value: string | string[]) {
+    return function (target: MetaTagged, propertyKey: string) {
+        const l2k = configureProp(target, propertyKey, { label: value }).labelToKey;
+        if (typeof value === 'string') {
+            l2k.set(value, propertyKey);
+        } else {
+            for (let i = 0; i < value.length; i++) {
+                l2k.set(value[i], [propertyKey, i])
+            }
+        }
+    }
+}
+
+function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], init?: () => any }) {
+    if (target[META] === undefined) {
+        target[META] = {
+            props: new Map(),
+            labelToKey: new Map(),
+        };
+    }
+    let prop = target[META].props.get(propertyKey);
+    if (!prop) {
+        target[META].props.set(propertyKey, options);
+    } else {
+        for (const k in options) {
+            (prop as any)[k] = (options as any)[k];
+        }
+    }
+    return target[META];
+}
+
 const META: unique symbol = Symbol('sheetable metadata');
 
 interface MetaTagged {
     [META]?: {
         props: Map<string, {
-            label: string | string[],
+            label?: string | string[],
             init?: () => any,
         }>,
         labelToKey: Map<string, string | [string, number]>,
@@ -118,13 +207,14 @@ function createHeaders(
     colStart: number,
     row: number,
 ): HeaderNode {
+    //SpreadsheetApp.getUi().alert(JSON.stringify(obj));
     const children: (Omit<HeaderChild, 'parent'>)[] = [];
     let col = colStart;
     for (const k in obj) {
         const v = obj[k];
         if (Array.isArray(v)) {
             for (let i = 0; i < v.length; i++) {
-                const label = obj[META]?.props.get(k)?.label[i] ?? `${k}[${i}]`;
+                const label = obj[META]?.props.get(k)?.label?.[i] ?? `${k}[${i}]`;
                 if (label === null) continue;
                 const subHeaders = {
                     ...createHeaders(v[i], col, row + 1),
@@ -184,7 +274,7 @@ interface Branch {
 
 type BranchResult = { branches: Branch[], minRowStop: number, maxRowStop: number };
 
-function findBranches(walker: TableWalker, ui: GoogleAppsScript.Base.Ui): BranchResult | null {
+function findBranches(walker: TableWalker, ui?: GoogleAppsScript.Base.Ui): BranchResult | null {
     if (!walker.value) return null;
     const startPoints = walker.filter(0, 1, v => v);
     // ui.alert(startPoints.map(p => `${p.col}/${p.value}`).join(', '));
@@ -244,7 +334,7 @@ function findBranches(walker: TableWalker, ui: GoogleAppsScript.Base.Ui): Branch
     };
 }
 
-function readHeaders(walker: TableWalker, obj: MetaTagged, ui: GoogleAppsScript.Base.Ui): HeaderNode | undefined {
+function readHeaders(walker: TableWalker, obj: MetaTagged, ui?: GoogleAppsScript.Base.Ui): HeaderNode | undefined {
     let headerBranches: Branch[] = [];
     let rowStop = walker.region.rowStop;
     if (!walker.value) {
@@ -275,7 +365,7 @@ function readHeaders(walker: TableWalker, obj: MetaTagged, ui: GoogleAppsScript.
 }
 
 
-function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpty: 'index' | 'ignore', ui: GoogleAppsScript.Base.Ui): HeaderNode | undefined {
+function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpty: 'index' | 'ignore', ui?: GoogleAppsScript.Base.Ui): HeaderNode | undefined {
     // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
     if (branches.length === 0 || branches[0].row >= rowStop) return undefined;
     const root: HeaderNode = {

@@ -1,8 +1,9 @@
 function onOpen() {
     SpreadsheetApp.getUi()
     .createMenu('Tests')
+    .addItem('Test 0a', 'test00a')
     .addItem('Test 1a', 'test01a')
-    .addItem('Test 1b', 'test1b')
+    .addItem('Test 1b', 'test01b')
     .addItem('Delete other sheets', 'delSheets')
     .addToUi();
 }
