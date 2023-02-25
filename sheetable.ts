@@ -2,7 +2,7 @@ type Sheet = GoogleAppsScript.Spreadsheet.Sheet;
 type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
 
 function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
-    return class Table {
+    return class Table implements Table {
         readonly sheet: Sheet;
         readonly orientation: Orientation;
         private headers: HeaderNode;
@@ -29,35 +29,10 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
     };
 }
 
-// function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
-//     return class extends Constructor {
-//         static Table = class Table {
-//             readonly sheet: Sheet;
-//             readonly orientation: Orientation;
-//             private headers: HeaderNode;
-        
-//             constructor(spreadSheet: Spreadsheet, data?: T[]);
-//             constructor(sheet: Sheet);
-//             constructor(doc: Spreadsheet | Sheet, data?: T[]) {
-//                 let sheet: Sheet;
-//                 if ('insertSheet' in doc) {
-//                     sheet = doc.insertSheet();
-//                     const specimen = data?.[0] ?? new Constructor();
-//                     this.headers = createHeaders(specimen, 1, 1);
-//                     writeHeaders(this.headers, sheet);
-//                 } else {
-//                     sheet = doc;
-//                     const headers = readHeaders(TableWalker.fromSheet(sheet), new Book());
-//                     if (!headers)
-//                         throw new Error('Error reading table headers.');
-//                     this.headers = headers;
-//                 }
-//                 this.sheet = sheet;
-//                 this.orientation = getOrientation(sheet);
-//             }
-//         };
-//     };
-// }
+interface Table {
+    readonly sheet: Sheet;
+    readonly orientation: Orientation;
+}
 
 function label(value: string | string[]) {
     return function (target: MetaTagged, propertyKey: string) {
@@ -107,81 +82,6 @@ interface HeaderLabels {
     [K: string]: string | string[];
 }
 
-type Orientation = 'normal' | 'transposed';
-
-class Sheetable<T extends MetaTagged> {
-    ctor: new () => T;
-    //headerLabels: HeaderLabels;
-    //headerKeys: Map<string, string | [string, number]>;
-    defaultOrientation: Orientation = 'normal';
-    
-    constructor(ctor: new () => T) {
-        this.ctor = ctor;
-        // this.headerLabels = headers;
-        // this.headerKeys = new Map();
-        // for (const k in this.headerLabels) {
-        //     const v = this.headerLabels[k];
-        //     if (typeof v === 'string') {
-        //         this.headerKeys.set(v, k);
-        //     } else {
-        //         for (let i = 0; i < v.length; i++) {
-        //             this.headerKeys.set(v[i], [k, i]);
-        //         }
-        //     }
-        // }
-    }
-
-    // private applyMetadata(obj: T) {
-    //     const props = new Map();
-    //     for (const k in this.headerLabels) {
-    //         props.set(k, { label: this.headerLabels[k] });
-    //     }
-    //     obj[META] = {
-    //         props: props,
-    //         labelToKey: this.headerKeys,
-    //     };
-    // }
-
-    create(spreadsheet: Spreadsheet, data?: T[]): Table<T>;
-    create(sheet: Sheet, data?: T[]): Table<T>; 
-    create(spreadsheet: Spreadsheet | Sheet, data?: T[]): Table<T> {
-        const sheet = 'insertSheet' in spreadsheet ? spreadsheet.insertSheet() : spreadsheet;
-        // if no data was passed, create dummy entry (needed to determine layout)
-        data ??= [new this.ctor()];
-        // for (const obj of data) {
-        //     this.applyMetadata(obj);
-        // }
-        return Table.create(sheet, data);
-    }
-
-    open(sheet: Sheet) {
-        return Table.open(sheet);
-    }
-}
-
-class Table<T extends MetaTagged> {
-    readonly sheet: Sheet;
-    readonly orientation: Orientation;
-
-    private constructor(sheet: Sheet, orient: Orientation) {
-        this.sheet = sheet;
-        this.orientation = orient;
-    }
-    static create<T extends MetaTagged>(sheet: Sheet, data: T[]): Table<T> {
-        sheet.clear();
-        const headers = createHeaders(data[0], 1, 1);
-        writeHeaders(headers, sheet);
-        return new Table(sheet, 'normal');
-    }
-    static open<T extends MetaTagged>(sheet: Sheet): Table<T> {
-
-
-
-        return new Table(sheet, 'normal');
-    }
-
-}
-
 interface HeaderNode {
     readonly colStart: number;
     readonly colStop: number;
@@ -207,7 +107,6 @@ function createHeaders(
     colStart: number,
     row: number,
 ): HeaderNode {
-    //SpreadsheetApp.getUi().alert(JSON.stringify(obj));
     const children: (Omit<HeaderChild, 'parent'>)[] = [];
     let col = colStart;
     for (const k in obj) {
@@ -274,10 +173,9 @@ interface Branch {
 
 type BranchResult = { branches: Branch[], minRowStop: number, maxRowStop: number };
 
-function findBranches(walker: TableWalker, ui?: GoogleAppsScript.Base.Ui): BranchResult | null {
+function findBranches(walker: TableWalker): BranchResult | null {
     if (!walker.value) return null;
     const startPoints = walker.filter(0, 1, v => v);
-    // ui.alert(startPoints.map(p => `${p.col}/${p.value}`).join(', '));
     const topLevel = walker.row === walker.region.rowStart;
     let minRowStop = walker.region.rowStart + 1; //#???
     let maxRowStop = walker.region.rowStop;
@@ -285,25 +183,14 @@ function findBranches(walker: TableWalker, ui?: GoogleAppsScript.Base.Ui): Branc
     for (let i = 0; i < startPoints.length; i++) {
         const stop = startPoints[i + 1]?.col ?? walker.region.colStop;
         const region = startPoints[i].move(1, 0)?.crop(undefined, maxRowStop, undefined, stop);
-        // ui.alert(`region: ${region}\nregion.value: ${region?.value}`);
         let children: Branch[] = [];
         if (region) {
-            const nextLevel = findBranches(region, ui);
+            const nextLevel = findBranches(region);
             if (nextLevel) {
                 if (minRowStop < nextLevel.minRowStop)
                     minRowStop = nextLevel.minRowStop;
                 if (maxRowStop > nextLevel.maxRowStop)
                     maxRowStop = nextLevel.maxRowStop;
-                // // Gaps between branches are only allowed at the top level
-                // if (!topLevel) {
-                //     for (let j = 0; j < nextLevel.branches.length - 1; j++) {
-                //         if (nextLevel.branches[j].stop !== nextLevel.branches[j + 1].start) {
-                //             // Discard all items after the gap
-                //             nextLevel.branches.length = j + 1;
-                //             break;
-                //         }
-                //     }
-                // }
                 children = nextLevel.branches;
             } else {
                 const dataStart = region.find(1, 0, v => v);
@@ -320,13 +207,11 @@ function findBranches(walker: TableWalker, ui?: GoogleAppsScript.Base.Ui): Branc
             stop: actualStop,
             children: children,
         })
-        //ui.alert(`startPoints[i].value: ${startPoints[i].value}\ntopLevel: ${topLevel}\nstop: ${stop}\nactualStop: ${actualStop}\nchildren.length: ${children.length}`);
         // Gaps between branches are only allowed at the top level
         if (!topLevel && stop !== undefined && actualStop < stop) break;
     }
     if (arr.length > 1 && minRowStop < walker.row + 1)
         minRowStop = walker.row + 1;
-    //ui.alert(`arr.length: ${arr.length}\nminRowStop: ${minRowStop}\nmaxRowStop: ${maxRowStop}`);
     return {
         branches: arr,
         minRowStop: minRowStop,
@@ -334,7 +219,7 @@ function findBranches(walker: TableWalker, ui?: GoogleAppsScript.Base.Ui): Branc
     };
 }
 
-function readHeaders(walker: TableWalker, obj: MetaTagged, ui?: GoogleAppsScript.Base.Ui): HeaderNode | undefined {
+function readHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
     let headerBranches: Branch[] = [];
     let rowStop = walker.region.rowStop;
     if (!walker.value) {
@@ -352,7 +237,7 @@ function readHeaders(walker: TableWalker, obj: MetaTagged, ui?: GoogleAppsScript
             next = next?.crop(undefined, dataStart.row);
         walker = next ?? walker;
     }
-    const br = findBranches(walker, ui);
+    const br = findBranches(walker);
     if (br) {
         const { branches, minRowStop, maxRowStop } = br;
         // ui.alert(JSON.stringify(branches));
@@ -361,11 +246,11 @@ function readHeaders(walker: TableWalker, obj: MetaTagged, ui?: GoogleAppsScript
         // maxRowStop overrides minRowStop; if exact depth is uncertain, assume minimum
         rowStop = Math.min(minRowStop, maxRowStop);
     }
-    return getHeaders(obj, headerBranches, rowStop, 'index', ui);
+    return getHeaders(obj, headerBranches, rowStop, 'index');
 }
 
 
-function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpty: 'index' | 'ignore', ui?: GoogleAppsScript.Base.Ui): HeaderNode | undefined {
+function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpty: 'index' | 'ignore'): HeaderNode | undefined {
     // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
     if (branches.length === 0 || branches[0].row >= rowStop) return undefined;
     const root: HeaderNode = {
@@ -413,7 +298,7 @@ function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpt
             key: key,
             label: b.label,
         };
-        const hn = getHeaders(item ?? {}, b.children, rowStop, 'ignore', ui);
+        const hn = getHeaders(item ?? {}, b.children, rowStop, 'ignore');
         if (hn) {
             node.children = hn.children.map(child => ({ ...child, parent: node }));
         }
@@ -516,6 +401,8 @@ class TableWalker {
         }
     }
 }
+
+type Orientation = 'normal' | 'transposed';
 
 function getOrientation(sheet: Sheet): Orientation {
     const v = sheet.getRange(1, 1).getValue();

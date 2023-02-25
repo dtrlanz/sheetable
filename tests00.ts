@@ -16,5 +16,4 @@ function test00a() {
     const ui = SpreadsheetApp.getUi();
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const pets = new Pet.Table(spreadsheet, [new Pet()]);
-    const p = new Pet();
 }
