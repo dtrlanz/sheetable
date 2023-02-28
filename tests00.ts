@@ -13,7 +13,8 @@ class Pet {
 
 
 function test00a() {
-    const ui = SpreadsheetApp.getUi();
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const spreadsheet = SpreadsheetApp.openById('1EcUEaQyVXk6XkqAFva70QRwsrsbvImUu0hKR6jz9I00');
     const pets = new Pet.Table(spreadsheet, [new Pet()]);
+
+    return 'all good';
 }

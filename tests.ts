@@ -5,6 +5,7 @@ function onOpen() {
     .addItem('Test 1a', 'test01a')
     .addItem('Test 1b', 'test01b')
     .addItem('Delete other sheets', 'delSheets')
+    .addItem('Open sidebar', 'testSidebar')
     .addToUi();
 }
 
@@ -58,3 +59,15 @@ function stringifyHeaders(table: Table): string {
     }
 }
 
+function testSidebar() {
+    const sidebar = HtmlService.createTemplateFromFile('test');
+    sidebar.docId = SpreadsheetApp.getActiveSpreadsheet().getId();
+    const html = sidebar.evaluate().setTitle('Test Sidebar');
+    SpreadsheetApp.getUi().showSidebar(html);
+}
+
+function doGet() {
+    const sidebar = HtmlService.createTemplateFromFile('test');
+    sidebar.docId = '' // SpreadsheetApp.getActiveSpreadsheet().getId();
+    return sidebar.evaluate().setTitle('Test Sidebar');
+}

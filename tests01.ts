@@ -29,6 +29,8 @@ function test01a() {
     const ui = SpreadsheetApp.getUi();
     const table = new Book.Table(sheet);
     ui.alert(stringifyHeaders(table));
+
+    return 'cool';
 }
 
 function test01b() {
@@ -43,5 +45,4 @@ function test01b() {
     `);
     const table = new Book.Table(sheet);
     ui.alert(stringifyHeaders(table));
-
 }

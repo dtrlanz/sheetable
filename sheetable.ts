@@ -2,36 +2,40 @@ type Sheet = GoogleAppsScript.Spreadsheet.Sheet;
 type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
 
 function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
-    return class Table implements Table {
-        readonly sheet: Sheet;
-        readonly orientation: Orientation;
-        private headers: HeaderNode;
-    
+    return class TypedTable extends Table<T> {
         constructor(spreadSheet: Spreadsheet, data?: T[]);
         constructor(sheet: Sheet);
         constructor(doc: Spreadsheet | Sheet, data?: T[]) {
             let sheet: Sheet;
+            let headers: HeaderNode;
             if ('insertSheet' in doc) {
                 sheet = doc.insertSheet();
                 const specimen = data?.[0] ?? new Constructor();
-                this.headers = createHeaders(specimen, 1, 1);
-                writeHeaders(this.headers, sheet);
+                headers = createHeaders(specimen, 1, 1);
+                writeHeaders(headers, sheet);
             } else {
                 sheet = doc;
-                const headers = readHeaders(TableWalker.fromSheet(sheet), new Constructor());
-                if (!headers)
-                    throw new Error('Error reading table headers.');
-                this.headers = headers;
+                const r = readHeaders(TableWalker.fromSheet(sheet), new Constructor());
+                if (!r) throw new Error('Error reading table headers.');
+                headers = r;
             }
-            this.sheet = sheet;
-            this.orientation = getOrientation(sheet);
+            super(Constructor, sheet, headers);
         }
     };
 }
 
-interface Table {
+class Table<T> {
     readonly sheet: Sheet;
     readonly orientation: Orientation;
+    private headers: HeaderNode;
+    private ctor: { new (): T };
+
+    constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode) {
+        this.ctor = ctor;
+        this.sheet = sheet;
+        this.orientation = getOrientation(sheet);
+        this.headers = headers;
+    }
 }
 
 function label(value: string | string[]) {
@@ -45,6 +49,18 @@ function label(value: string | string[]) {
             }
         }
     }
+}
+
+function index(target: MetaTagged, propertyKey: string) {
+    if (target[META]) {
+        target[META].index = propertyKey;
+        return;
+    }
+    target[META] = {
+        props: new Map(),
+        labelToKey: new Map(),
+        index: propertyKey,
+    };
 }
 
 function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], init?: () => any }) {
@@ -74,6 +90,7 @@ interface MetaTagged {
             init?: () => any,
         }>,
         labelToKey: Map<string, string | [string, number]>,
+        index?: string,
     };
     [k: string]: any;
 }
@@ -223,10 +240,10 @@ function readHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefin
     let headerBranches: Branch[] = [];
     let rowStop = walker.region.rowStop;
     if (!walker.value) {
-        // if first column has no header, use it as index
+        // unlabeled first column is ok (other columns are recognized by their headers)
         let next = walker.find(0, 1, v => v);
         headerBranches.push({
-            label: undefined,
+            label: '',
             row: walker.row,
             start: walker.col,
             stop: next?.col ?? walker.col + 1,
@@ -240,17 +257,15 @@ function readHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefin
     const br = findBranches(walker);
     if (br) {
         const { branches, minRowStop, maxRowStop } = br;
-        // ui.alert(JSON.stringify(branches));
-        // ui.alert(`${minRowStop}, ${maxRowStop}`);
         headerBranches = [...headerBranches, ...branches];
         // maxRowStop overrides minRowStop; if exact depth is uncertain, assume minimum
         rowStop = Math.min(minRowStop, maxRowStop);
     }
-    return getHeaders(obj, headerBranches, rowStop, 'index');
+    return getHeaders(obj, headerBranches, rowStop);
 }
 
 
-function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpty: 'index' | 'ignore'): HeaderNode | undefined {
+function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number): HeaderNode | undefined {
     // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
     if (branches.length === 0 || branches[0].row >= rowStop) return undefined;
     const root: HeaderNode = {
@@ -261,12 +276,7 @@ function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpt
     };
     for (const b of branches) {
         let key: string | [string, number];
-        if (b.label === undefined && ifEmpty === 'index') {
-            key = 'index';
-        } else {
-            key = obj[META]?.labelToKey.get(String(b.label)) 
-                ?? String(b.label);
-        }
+        key = obj[META]?.labelToKey.get(String(b.label)) ?? String(b.label);
 
         let item;
         if (typeof key === 'string') {
@@ -298,7 +308,7 @@ function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number, ifEmpt
             key: key,
             label: b.label,
         };
-        const hn = getHeaders(item ?? {}, b.children, rowStop, 'ignore');
+        const hn = getHeaders(item ?? {}, b.children, rowStop);
         if (hn) {
             node.children = hn.children.map(child => ({ ...child, parent: node }));
         }
