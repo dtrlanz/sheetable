@@ -24,19 +24,77 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
     };
 }
 
-class Table<T> {
+class Table<T extends MetaTagged> {
     readonly sheet: Sheet;
     readonly orientation: Orientation;
-    private headers: HeaderNode;
     private ctor: { new (): T };
+    private headers: HeaderNode;
+    readonly data: Region;
+    private index: Map<string, number> = new Map();
 
     constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode) {
         this.ctor = ctor;
         this.sheet = sheet;
         this.orientation = getOrientation(sheet);
         this.headers = headers;
+        const firstDataRow = getMaxRow(headers) + 1;
+        this.data = Region.fromSheet(sheet).resize(firstDataRow);
+    }
+
+    row(row: number): T | undefined {
+        const ui = SpreadsheetApp.getUi();
+        const vals = this.data.getRow(row);
+        //ui.alert(JSON.stringify(vals));
+        if (!vals) return undefined;
+
+        const obj = new this.ctor();
+        applyRowValues(obj, vals, this.headers);
+        return obj;
     }
 }
+
+function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
+    const ui = SpreadsheetApp.getUi();
+    if (headers.children.length === 0 && 'key' in headers) {
+        const val = row[headers.colStart - 1];
+        //ui.alert(`val: ${val}\nkey: ${headers.key}`);
+        if (typeof headers.key === 'string') {
+            if (headers.key in target) {
+                applyValue(target, headers.key, val);
+            }
+        } else {
+            if (Array.isArray(target[headers.key[0]])) {
+                applyValue(target[headers.key[0]], headers.key[1], val);
+            }
+        }
+    } else {
+        let obj = target;
+        if ('key' in headers) {
+            if (typeof headers.key === 'string') {
+                obj = target[headers.key];
+            } else {
+                obj = target[headers.key[0]][headers.key[1]];
+            }
+        }
+        for (const c of headers.children) {
+            applyRowValues(obj, row, c);
+        }
+    }
+}
+
+function applyValue(target: any, propertyKey: string | number, val: any) {
+    if (typeof target[propertyKey] === 'number' && typeof val === 'number') {
+        target[propertyKey] = val;
+    } else if (typeof target[propertyKey] === 'string') {
+        target[propertyKey] = String(val);
+    }
+}
+
+function getMaxRow(headers: HeaderNode): number {
+    return Math.max(headers.row, ...headers.children.map(c => getMaxRow(c)));
+}
+
+type IndexLike = string | {};
 
 function label(value: string | string[]) {
     return function (target: MetaTagged, propertyKey: string) {
@@ -79,6 +137,10 @@ function configureProp(target: MetaTagged, propertyKey: string, options: { label
         }
     }
     return target[META];
+}
+
+function labelToKey(obj: MetaTagged, label: any): string | [string, number] {
+    return obj[META]?.labelToKey.get(String(label)) ?? String(label);
 }
 
 const META: unique symbol = Symbol('sheetable metadata');
@@ -191,8 +253,10 @@ interface Branch {
 type BranchResult = { branches: Branch[], minRowStop: number, maxRowStop: number };
 
 function findBranches(walker: TableWalker): BranchResult | null {
+    //const ui = SpreadsheetApp.getUi();
     if (!walker.value) return null;
     const startPoints = walker.filter(0, 1, v => v);
+    //ui.alert(JSON.stringify(startPoints.map(p => p.value)));
     const topLevel = walker.row === walker.region.rowStart;
     let minRowStop = walker.region.rowStart + 1; //#???
     let maxRowStop = walker.region.rowStop;
@@ -200,6 +264,7 @@ function findBranches(walker: TableWalker): BranchResult | null {
     for (let i = 0; i < startPoints.length; i++) {
         const stop = startPoints[i + 1]?.col ?? walker.region.colStop;
         const region = startPoints[i].move(1, 0)?.crop(undefined, maxRowStop, undefined, stop);
+        //ui.alert(`walker.value: ${walker.value}\nstartpoints[i].value: ${startPoints[i].value}\nstop: ${stop}\nmaxRowStop: ${maxRowStop}\nregion: ${region}`);
         let children: Branch[] = [];
         if (region) {
             const nextLevel = findBranches(region);
@@ -276,7 +341,7 @@ function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number): Heade
     };
     for (const b of branches) {
         let key: string | [string, number];
-        key = obj[META]?.labelToKey.get(String(b.label)) ?? String(b.label);
+        key = labelToKey(obj, b.label);
 
         let item;
         if (typeof key === 'string') {
@@ -318,13 +383,63 @@ function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number): Heade
 }
 
 
-interface Region {
-    sheet: Sheet;
-    orientation: Orientation;
-    colStart: number;
-    colStop: number;
-    rowStart: number;
-    rowStop: number;
+class Region {
+    readonly sheet: Sheet;
+    readonly orientation: Orientation;
+    readonly colStart: number;
+    readonly colStop: number;
+    readonly rowStart: number;
+    readonly rowStop: number;
+
+    constructor(sheet: Sheet, rowStart: number, rowStop: number, colStart: number, colStop: number, orientation?: Orientation) {
+        this.sheet = sheet;
+        this.orientation = orientation ?? getOrientation(sheet);
+        this.colStart = colStart;
+        this.colStop = colStop;
+        this.rowStart = rowStart;
+        this.rowStop = rowStop;
+    }
+
+    static fromSheet(sheet: Sheet): Region {
+        const orient = getOrientation(sheet);
+        let rowStop = sheet.getLastRow() + 1;
+        let colStop = sheet.getLastColumn() + 1;
+        if (orient === 'transposed') [colStop, rowStop] = [rowStop, colStop];
+        return new Region(sheet, 1, rowStop, 1, colStop, orient);
+    }
+
+    resize(rowStart?: number, rowStop?: number, colStart?: number, colStop?: number): Region {
+        rowStart ??= this.rowStart;
+        rowStop ??= this.rowStop;
+        colStart ??= this.colStart;
+        colStop ??= this.colStop;
+        return new Region(this.sheet, 1, rowStop, 1, colStop, this.orientation);
+    }
+
+    get(row: number, col: number): any {
+        if (row < this.rowStart || row >= this.rowStop || col < this.colStart || col >= this.colStop) 
+            return undefined;
+
+        if (this.orientation === 'normal') {
+            return this.sheet.getRange(row, col).getValue();
+        } else {
+            return this.sheet.getRange(col, row).getValue();
+        }
+    }
+
+    getRow(row: number): any[] | undefined {
+        if (row < this.rowStart || row >= this.rowStop)
+            return undefined;
+
+        if (this.orientation === 'normal') {
+            return this.sheet.getRange(row, this.colStart, 1, this.colStop - this.colStart)
+                .getValues()[0];
+        } else {
+            return this.sheet.getRange(this.colStart, row, this.colStop - this.colStart, 1)
+                .getValues()
+                .map(r => r[0]);
+        }
+    }
 }
 
 class TableWalker {
@@ -332,25 +447,14 @@ class TableWalker {
     readonly row: number;
     readonly col: number;
 
-    private constructor(region: Region, row?: number, col?: number) {
+    constructor(region: Region, row?: number, col?: number) {
         this.region = region;
         this.row = row ?? 1;
         this.col = col ?? 1;
     }
 
     static fromSheet(sheet: Sheet): TableWalker {
-        const orient = getOrientation(sheet);
-        let rowStop = sheet.getLastRow() + 1;
-        let colStop = sheet.getLastColumn() + 1;
-        if (orient === 'transposed') [colStop, rowStop] = [rowStop, colStop];
-        return new TableWalker({
-            sheet: sheet,
-            orientation: orient,
-            rowStart: 1,
-            rowStop: rowStop,
-            colStart: 1,
-            colStop: colStop,
-        });
+        return new TableWalker(Region.fromSheet(sheet));
     }
 
     move(row: number, col: number): TableWalker | undefined {
@@ -372,14 +476,7 @@ class TableWalker {
         if (rowStart <= this.row && this.row < rowStop 
             && colStart <= this.col && this.col < colStop) 
         {
-            return new TableWalker({
-                sheet: this.region.sheet,
-                orientation: this.region.orientation,
-                rowStart: rowStart,
-                rowStop: rowStop,
-                colStart: 1,
-                colStop: colStop,
-            }, this.row, this.col);
+            return new TableWalker(new Region(this.region.sheet, rowStart, rowStop, 1, colStop), this.row, this.col);
         }
         return undefined;
     }
@@ -404,11 +501,7 @@ class TableWalker {
     }
 
     get value() {
-        if (this.region.orientation === 'normal') {
-            return this.region.sheet.getRange(this.row, this.col).getValue();
-        } else {
-            return this.region.sheet.getRange(this.col, this.row).getValue();
-        }
+        return this.region.get(this.row, this.col);
     }
 }
 

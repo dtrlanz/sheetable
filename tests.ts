@@ -4,6 +4,8 @@ function onOpen() {
     .addItem('Test 0a', 'test00a')
     .addItem('Test 1a', 'test01a')
     .addItem('Test 1b', 'test01b')
+    .addItem('Test 2a', 'test02a')
+    .addItem('Test 2b', 'test02b')
     .addItem('Delete other sheets', 'delSheets')
     .addItem('Open sidebar', 'testSidebar')
     .addToUi();
@@ -34,8 +36,8 @@ function newSheet(content: string = '') {
     return sheet;
 }
 
-function stringifyHeaders(table: Table): string {
-    return stringify((table as any).headers);
+function stringifyHeaders<T extends MetaTagged>(table: Table<T>): string {
+    return stringify(table.headers);
 
     function stringify(headers: HeaderNode, level: number = 0): string {
         let r = '';
