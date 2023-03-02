@@ -32,3 +32,23 @@ function test02b() {
     ui.alert(JSON.stringify(r6));
 }
 
+function test02c() {
+    const sheet = newSheet(`
+        Species  | Name   | Age
+        dog      | Fluffy | 5
+        cat      | Billy  | 3
+        goldfish | Bob    | 1
+        dog      | Karl   | 6
+    `);
+    const table = new Pet.Table(sheet);
+
+    const ui = SpreadsheetApp.getUi();
+    const fluffy = table.get('Fluffy');
+    const billy = table.get('Billy');
+    const bob = table.get('Bob');
+    const karl = table.get('Karl');
+    ui.alert(JSON.stringify(fluffy));
+    ui.alert(JSON.stringify(billy));
+    ui.alert(JSON.stringify(bob));
+    ui.alert(JSON.stringify(karl));
+}

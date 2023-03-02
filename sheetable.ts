@@ -30,6 +30,8 @@ class Table<T extends MetaTagged> {
     private ctor: { new (): T };
     private headers: HeaderNode;
     readonly data: Region;
+    private cache: T[] = [];
+    readonly indexKey: string | undefined;
     private index: Map<string, number> = new Map();
 
     constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode) {
@@ -39,17 +41,57 @@ class Table<T extends MetaTagged> {
         this.headers = headers;
         const firstDataRow = getMaxRow(headers) + 1;
         this.data = Region.fromSheet(sheet).resize(firstDataRow);
+        const specimen = this.row(this.data.rowStart);
+        this.indexKey = specimen?.[META]?.index;
+        this.initIndex();
     }
 
-    row(row: number): T | undefined {
-        const ui = SpreadsheetApp.getUi();
+    private initIndex() {
+        if (!this.indexKey) return;
+        this.index.clear();
+        // let indexField: HeaderChild | undefined;
+        // for (const c of this.headers.children) {
+        //     if (c.key === this.indexKey) {
+        //         indexField = c;
+        //         break;
+        //     }
+        // }
+        // if (!indexField) return;
+
+        for (let row = this.data.rowStart; row < this.data.rowStop; row++) {
+            const entry = this.row(row);
+            if (entry?.[this.indexKey])
+                this.index.set(String(entry[this.indexKey]), row);
+        }
+    }
+
+    row(row: number, refresh?: boolean): T | undefined {
+        const cached = this.cache[row - this.data.rowStart];
+        if (cached && !refresh) return cached;
+
         const vals = this.data.getRow(row);
-        //ui.alert(JSON.stringify(vals));
         if (!vals) return undefined;
 
         const obj = new this.ctor();
         applyRowValues(obj, vals, this.headers);
+        this.cache[row - this.data.rowStart] = obj;
         return obj;
+    }
+
+    get(idx: IndexLike, refresh?: boolean): T | undefined {
+        if (!this.indexKey) return undefined;
+        let strIdx: string;
+
+        if (typeof idx === 'string') {
+            strIdx = idx;
+        } else {
+            const field = (idx as any)[this.indexKey];
+            if (field === undefined) return undefined;
+            strIdx = String(field);
+        }
+        const row = this.index.get(strIdx);
+        if (row) return this.row(row, refresh);
+        return undefined;
     }
 }
 
