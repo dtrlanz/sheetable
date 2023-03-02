@@ -29,10 +29,10 @@ class Table<T extends MetaTagged> {
     readonly orientation: Orientation;
     private ctor: { new (): T };
     private headers: HeaderNode;
-    readonly data: Region;
     private cache: T[] = [];
     readonly indexKey: string | undefined;
     private index: Map<string, number> = new Map();
+    data: Region;
 
     constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode) {
         this.ctor = ctor;
@@ -49,15 +49,6 @@ class Table<T extends MetaTagged> {
     private initIndex() {
         if (!this.indexKey) return;
         this.index.clear();
-        // let indexField: HeaderChild | undefined;
-        // for (const c of this.headers.children) {
-        //     if (c.key === this.indexKey) {
-        //         indexField = c;
-        //         break;
-        //     }
-        // }
-        // if (!indexField) return;
-
         for (let row = this.data.rowStart; row < this.data.rowStop; row++) {
             const entry = this.row(row);
             if (entry?.[this.indexKey])
@@ -69,7 +60,7 @@ class Table<T extends MetaTagged> {
         const cached = this.cache[row - this.data.rowStart];
         if (cached && !refresh) return cached;
 
-        const vals = this.data.getRow(row);
+        const vals = this.data.readRow(row);
         if (!vals) return undefined;
 
         const obj = new this.ctor();
@@ -78,28 +69,50 @@ class Table<T extends MetaTagged> {
         return obj;
     }
 
-    get(idx: IndexLike, refresh?: boolean): T | undefined {
-        if (!this.indexKey) return undefined;
-        let strIdx: string;
-
-        if (typeof idx === 'string') {
-            strIdx = idx;
-        } else {
-            const field = (idx as any)[this.indexKey];
-            if (field === undefined) return undefined;
-            strIdx = String(field);
-        }
+    get(idx: string | Partial<T>, refresh?: boolean): T | undefined {
+        const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
+        if (strIdx === undefined) return undefined;
         const row = this.index.get(strIdx);
-        if (row) return this.row(row, refresh);
+        if (row === undefined) return undefined;
+        return this.row(row, refresh);
+    }
+
+    set(idx: string | Partial<T>, entry: Partial<T>): void;
+    set(row: number, entry: Partial<T>): void;
+    set(entry: Partial<T>): void;
+    set(idx: string | Partial<T> | number, entry?: Partial<T>) {
+        let strIdx: string | undefined; 
+        let row: number;
+        let idxRow: number | undefined;
+        if (typeof idx === 'number') {
+            strIdx = undefined;
+            row = idx;
+        } else {
+            strIdx = typeof idx === 'string' ? strIdx = idx 
+                                             : this.getIndex(idx);
+            idxRow = strIdx !== undefined ? this.index.get(strIdx) : undefined;
+            row = idxRow ?? this.data.rowStop;
+        }
+        entry ??= typeof idx === 'object' ? idx : {};
+        const vals: any[] = [];
+        fillRowValues(entry, vals, this.headers);
+        this.data = this.data.writeRow(row, vals, 'encroach');
+        if (strIdx && idxRow !== row)
+            this.index.set(strIdx, row);
+        delete this.cache[row];
+    }
+
+    private getIndex(entry: Partial<T>): string | undefined {
+        if (!this.indexKey) return undefined;
+        const field = (entry as any)[this.indexKey];
+        if (field !== undefined) return String(field);
         return undefined;
     }
 }
 
 function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
-    const ui = SpreadsheetApp.getUi();
     if (headers.children.length === 0 && 'key' in headers) {
         const val = row[headers.colStart - 1];
-        //ui.alert(`val: ${val}\nkey: ${headers.key}`);
         if (typeof headers.key === 'string') {
             if (headers.key in target) {
                 applyValue(target, headers.key, val);
@@ -124,6 +137,31 @@ function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | He
     }
 }
 
+function fillRowValues(source: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
+    if (headers.children.length === 0 && 'key' in headers) {
+        let val: any;
+        if (typeof headers.key === 'string') {
+            val = source[headers.key];
+        } else {
+            val = source[headers.key[0]][headers.key[1]];
+        }
+        if (val !== undefined)
+            row[headers.colStart - 1] = val;
+    } else {
+        let obj = source;
+        if ('key' in headers) {
+            if (typeof headers.key === 'string') {
+                obj = source[headers.key];
+            } else {
+                obj = source[headers.key[0]][headers.key[1]];
+            }
+        }
+        for (const c of headers.children) {
+            fillRowValues(obj, row, c);
+        }
+    }
+}
+
 function applyValue(target: any, propertyKey: string | number, val: any) {
     if (typeof target[propertyKey] === 'number' && typeof val === 'number') {
         target[propertyKey] = val;
@@ -135,8 +173,6 @@ function applyValue(target: any, propertyKey: string | number, val: any) {
 function getMaxRow(headers: HeaderNode): number {
     return Math.max(headers.row, ...headers.children.map(c => getMaxRow(c)));
 }
-
-type IndexLike = string | {};
 
 function label(value: string | string[]) {
     return function (target: MetaTagged, propertyKey: string) {
@@ -458,7 +494,7 @@ class Region {
         return new Region(this.sheet, 1, rowStop, 1, colStop, this.orientation);
     }
 
-    get(row: number, col: number): any {
+    read(row: number, col: number): any {
         if (row < this.rowStart || row >= this.rowStop || col < this.colStart || col >= this.colStop) 
             return undefined;
 
@@ -469,7 +505,7 @@ class Region {
         }
     }
 
-    getRow(row: number): any[] | undefined {
+    readRow(row: number): any[] | undefined {
         if (row < this.rowStart || row >= this.rowStop)
             return undefined;
 
@@ -481,6 +517,29 @@ class Region {
                 .getValues()
                 .map(r => r[0]);
         }
+    }
+
+    writeRow(row: number, data: any[], onEnd: 'skip' | 'insert' | 'encroach'): Region {
+        let r: Region | undefined;
+        if (row >= this.rowStop) {
+            if (onEnd === 'skip') return this;
+            if (onEnd === 'insert') {
+                if (this.orientation === 'normal') {
+                    this.sheet.insertRows(this.rowStop, row - this.rowStop + 1)
+                } else {
+                    this.sheet.insertColumns(this.rowStop, row - this.rowStop + 1)
+                }
+            }
+            r = this.resize(undefined, row + 1);
+        }
+        if (this.orientation === 'normal') {
+            this.sheet.getRange(row, this.colStart, 1, this.colStop - this.colStart)
+                .setValues([data]);
+        } else {
+            this.sheet.getRange(this.colStart, row, this.colStop - this.colStart, 1)
+                .setValues(data.map(v => [v]));
+        }
+        return r ?? this;
     }
 }
 
@@ -543,7 +602,7 @@ class TableWalker {
     }
 
     get value() {
-        return this.region.get(this.row, this.col);
+        return this.region.read(this.row, this.col);
     }
 }
 

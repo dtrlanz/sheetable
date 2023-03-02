@@ -51,4 +51,46 @@ function test02c() {
     ui.alert(JSON.stringify(billy));
     ui.alert(JSON.stringify(bob));
     ui.alert(JSON.stringify(karl));
+
+    // manually change Karl's age to 7
+    sheet.getRange(5, 3).setValue(7);
+    // retrieve cached record (will not reflect change)
+    const old = table.get('Karl');
+    // force refresh (record will now reflect change)
+    const fromStr = table.get('Karl', true);
+    const fromObj = table.get(karl!);
+    ui.alert(JSON.stringify(old));
+    ui.alert(JSON.stringify(fromStr));
+    ui.alert(JSON.stringify(fromObj));
+}
+
+function test02d() {
+    const sheet = newSheet(`
+        Species  | Name   | Age
+        dog      | Fluffy | 5
+        cat      | Billy  | 3
+        goldfish | Bob    | 1
+        dog      | Karl   | 6
+    `);
+    const table = new Pet.Table(sheet);
+
+    const fluffy = table.get('Fluffy')!;
+    fluffy.age = 6;
+    table.set(fluffy);
+}
+
+function test02e() {
+    const sheet = newSheet(`
+        Species  | Name   | Age
+        dog      | Fluffy | 5
+        cat      | Billy  | 3
+        goldfish | Bob    | 1
+        dog      | Karl   | 6
+    `);
+    const table = new Pet.Table(sheet);
+
+    const fluffy = table.get('Fluffy')!;
+    fluffy.age = 6;
+    table.set('Fluffy', fluffy);
+    table.set(7, fluffy);
 }

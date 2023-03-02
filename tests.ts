@@ -7,6 +7,8 @@ function onOpen() {
     .addItem('Test 2a', 'test02a')
     .addItem('Test 2b', 'test02b')
     .addItem('Test 2c', 'test02c')
+    .addItem('Test 2d', 'test02d')
+    .addItem('Test 2e', 'test02e')
     .addItem('Delete other sheets', 'delSheets')
     .addItem('Open sidebar', 'testSidebar')
     .addToUi();
