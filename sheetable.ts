@@ -15,99 +15,13 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
                 writeHeaders(headers, sheet);
             } else {
                 sheet = doc;
-                const r = readHeaders(TableWalker.fromSheet(sheet), new Constructor());
+                const r = getHeaders(TableWalker.fromSheet(sheet), new Constructor());
                 if (!r) throw new Error('Error reading table headers.');
                 headers = r;
             }
             super(Constructor, sheet, headers);
         }
     };
-}
-
-class Table<T extends MetaTagged> {
-    readonly sheet: Sheet;
-    readonly orientation: Orientation;
-    private ctor: { new (): T };
-    private headers: HeaderNode;
-    private cache: T[] = [];
-    readonly indexKey: string | undefined;
-    private index: Map<string, number> = new Map();
-    data: Region;
-
-    constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode) {
-        this.ctor = ctor;
-        this.sheet = sheet;
-        this.orientation = getOrientation(sheet);
-        this.headers = headers;
-        const firstDataRow = getMaxRow(headers) + 1;
-        this.data = Region.fromSheet(sheet).resize(firstDataRow);
-        const specimen = this.row(this.data.rowStart);
-        this.indexKey = specimen?.[META]?.index;
-        this.initIndex();
-    }
-
-    private initIndex() {
-        if (!this.indexKey) return;
-        this.index.clear();
-        for (let row = this.data.rowStart; row < this.data.rowStop; row++) {
-            const entry = this.row(row);
-            if (entry?.[this.indexKey])
-                this.index.set(String(entry[this.indexKey]), row);
-        }
-    }
-
-    row(row: number, refresh?: boolean): T | undefined {
-        const cached = this.cache[row - this.data.rowStart];
-        if (cached && !refresh) return cached;
-
-        const vals = this.data.readRow(row);
-        if (!vals) return undefined;
-
-        const obj = new this.ctor();
-        applyRowValues(obj, vals, this.headers);
-        this.cache[row - this.data.rowStart] = obj;
-        return obj;
-    }
-
-    get(idx: string | Partial<T>, refresh?: boolean): T | undefined {
-        const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
-        if (strIdx === undefined) return undefined;
-        const row = this.index.get(strIdx);
-        if (row === undefined) return undefined;
-        return this.row(row, refresh);
-    }
-
-    set(idx: string | Partial<T>, entry: Partial<T>): void;
-    set(row: number, entry: Partial<T>): void;
-    set(entry: Partial<T>): void;
-    set(idx: string | Partial<T> | number, entry?: Partial<T>) {
-        let strIdx: string | undefined; 
-        let row: number;
-        let idxRow: number | undefined;
-        if (typeof idx === 'number') {
-            strIdx = undefined;
-            row = idx;
-        } else {
-            strIdx = typeof idx === 'string' ? strIdx = idx 
-                                             : this.getIndex(idx);
-            idxRow = strIdx !== undefined ? this.index.get(strIdx) : undefined;
-            row = idxRow ?? this.data.rowStop;
-        }
-        entry ??= typeof idx === 'object' ? idx : {};
-        const vals: any[] = [];
-        fillRowValues(entry, vals, this.headers);
-        this.data = this.data.writeRow(row, vals, 'encroach');
-        if (strIdx && idxRow !== row)
-            this.index.set(strIdx, row);
-        delete this.cache[row];
-    }
-
-    private getIndex(entry: Partial<T>): string | undefined {
-        if (!this.indexKey) return undefined;
-        const field = (entry as any)[this.indexKey];
-        if (field !== undefined) return String(field);
-        return undefined;
-    }
 }
 
 function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
@@ -333,7 +247,7 @@ type BranchResult = { branches: Branch[], minRowStop: number, maxRowStop: number
 function findBranches(walker: TableWalker): BranchResult | null {
     //const ui = SpreadsheetApp.getUi();
     if (!walker.value) return null;
-    const startPoints = walker.filter(0, 1, v => v);
+    const startPoints = walker.findAll(0, 1, v => v);
     //ui.alert(JSON.stringify(startPoints.map(p => p.value)));
     const topLevel = walker.row === walker.region.rowStart;
     let minRowStop = walker.region.rowStart + 1; //#???
@@ -379,13 +293,35 @@ function findBranches(walker: TableWalker): BranchResult | null {
     };
 }
 
-function readHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
-    let headerBranches: Branch[] = [];
+function getHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
+    const { branches, rowStop } = getHeadersHelper(walker);
+    return getHeaderTree(obj, branches, rowStop);
+}
+
+function getHeadersForClient(walker: TableWalker): { branches: Branch[], rowStop: number } {
+    const { branches, rowStop } = getHeadersHelper(walker);
+    trimBranches(branches, rowStop);
+    return { branches, rowStop };
+
+    function trimBranches(branches: Branch[], rowStop: number) {
+        // assume children at the same level will always be in the same row
+        if (branches[0]?.row >= rowStop) {
+            branches.length = 0;
+            return;
+        }
+        for (const c of branches) {
+            trimBranches(c.children, rowStop);
+        }
+    }
+}
+
+function getHeadersHelper(walker: TableWalker): { branches: Branch[], rowStop: number } {
+    let branches: Branch[] = [];
     let rowStop = walker.region.rowStop;
     if (!walker.value) {
         // unlabeled first column is ok (other columns are recognized by their headers)
         let next = walker.find(0, 1, v => v);
-        headerBranches.push({
+        branches.push({
             label: '',
             row: walker.row,
             start: walker.col,
@@ -399,67 +335,13 @@ function readHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefin
     }
     const br = findBranches(walker);
     if (br) {
-        const { branches, minRowStop, maxRowStop } = br;
-        headerBranches = [...headerBranches, ...branches];
+        const { branches: otherBranches, minRowStop, maxRowStop } = br;
+        branches = [...branches, ...otherBranches];
         // maxRowStop overrides minRowStop; if exact depth is uncertain, assume minimum
         rowStop = Math.min(minRowStop, maxRowStop);
     }
-    return getHeaders(obj, headerBranches, rowStop);
+    return { branches, rowStop };
 }
-
-
-function getHeaders(obj: MetaTagged, branches: Branch[], rowStop: number): HeaderNode | undefined {
-    // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
-    if (branches.length === 0 || branches[0].row >= rowStop) return undefined;
-    const root: HeaderNode = {
-        colStart: branches[0].start,
-        colStop: branches[branches.length - 1].stop,
-        row: branches[0].row,
-        children: [],
-    };
-    for (const b of branches) {
-        let key: string | [string, number];
-        key = labelToKey(obj, b.label);
-
-        let item;
-        if (typeof key === 'string') {
-            if (obj[key] === undefined) {
-                const init = obj[META]?.props.get(key)?.init;
-                if (init) {
-                    obj[key] = init();
-                }
-            }
-            item = obj[key];
-        } else {
-            const [k, i] = key;
-            obj[k] ??= [];
-            if (obj[k][i] === undefined) {
-                const init = obj[META]?.props.get(k)?.init;
-                if (init) {
-                    obj[k][i] = init();
-                }
-            }
-            item = obj[k][i];
-        }
-
-        const node = {
-            row: b.row,
-            colStart: b.start,
-            colStop: b.stop,
-            children: [] as HeaderChild[],
-            parent: root,
-            key: key,
-            label: b.label,
-        };
-        const hn = getHeaders(item ?? {}, b.children, rowStop);
-        if (hn) {
-            node.children = hn.children.map(child => ({ ...child, parent: node }));
-        }
-        root.children.push(node);
-    }
-    return root;
-}
-
 
 class Region {
     readonly sheet: Sheet;
@@ -541,6 +423,23 @@ class Region {
         }
         return r ?? this;
     }
+
+    readAll(): any[][] {
+        if (this.orientation === 'normal') {
+            return this.sheet.getRange(this.rowStart, this.colStart, 
+                this.rowStop - this.rowStart, this.colStop - this.colStart)
+                .getValues();
+        } else {
+            const data = this.sheet.getRange(this.colStart, this.rowStart, 
+                this.colStop - this.colStart, this.rowStop - this.rowStart)
+                .getValues();
+            const transposed = [];
+            for (let i = 0; i < this.rowStop - this.rowStart; i++) {
+                transposed.push(data.map(col => col[i]));
+            }
+            return transposed;
+        }
+    }
 }
 
 class TableWalker {
@@ -591,11 +490,21 @@ class TableWalker {
         return undefined;
     }
 
-    filter(rowDelta: number, colDelta: number, predicate: (v: any) => boolean): TableWalker[] {
+    findAll(rowDelta: number, colDelta: number, predicate: (v: any) => boolean): TableWalker[] {
         const arr: TableWalker[] = [];
         let cur: TableWalker | undefined = this;
         while (cur) {
             if (predicate(cur.value)) arr.push(cur);
+            cur = cur.move(rowDelta, colDelta);
+        }
+        return arr;
+    }
+
+    map<T>(rowDelta: number, colDelta: number, callback: (v: any) => T): T[] {
+        const arr: T[] = [];
+        let cur: TableWalker | undefined = this;
+        while (cur) {
+            arr.push(callback(cur.value));
             cur = cur.move(rowDelta, colDelta);
         }
         return arr;
@@ -613,4 +522,84 @@ function getOrientation(sheet: Sheet): Orientation {
     if (typeof v === 'string' && v.substring(0, 2) === '>>') 
         return 'transposed';
     return 'normal';
+}
+
+type Sendable = boolean | number | string | null | undefined | { [K: string]: Sendable };
+
+interface SheetInfo {
+    url?: string;
+    id?: string;
+    sheetName?: string;
+}
+
+function getSheet(info: SheetInfo): { spreadsheet: Spreadsheet, sheet: Sheet } {
+    let spreadsheet: Spreadsheet;
+    let sheet: Sheet;
+    if (!info.url && !info.id) {
+        spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+        if (!info.sheetName) {
+            sheet = spreadsheet.getActiveSheet();
+        }
+    } else {
+        if (info.url) {
+            spreadsheet = SpreadsheetApp.openByUrl(info.url)
+        } else {
+            spreadsheet = SpreadsheetApp.openById(info.id!);
+        }
+    }
+    if (info.sheetName) {
+        const s = spreadsheet.getSheetByName(info.sheetName);
+        if (!s) throw new Error(`Sheet named '${info.sheetName} does not exist.`);
+        sheet = s;
+    } else {
+        sheet = spreadsheet.getSheets()[0];
+    }
+    return { spreadsheet, sheet};
+}
+
+interface SheetData {
+    url: string;
+    sheetName: string;
+    headers: Branch[];
+    dataStartRow: number;
+    columns: Sendable[][];
+}
+
+function getSheetData(info: SheetInfo = {}, columnLabels: string[] = []): SheetData {
+    const { spreadsheet, sheet } = getSheet(info);
+    const region = Region.fromSheet(sheet);
+    const { branches, rowStop } = getHeadersForClient(new TableWalker(region));
+
+    const columnData: Sendable[][] = [];
+    for (const label of columnLabels) {
+        for (const br of branches) {
+            if (br.label === label) {
+                for (let col = br.start; col < br.stop; col++) {
+                    const walker = new TableWalker(region, br.row, col)
+                    columnData[col] = walker.map(1, 0, scalarToSendable);
+                }
+                break;
+            }
+        }
+    }
+    
+    return {
+        url: spreadsheet.getUrl(),
+        sheetName: sheet.getName(),
+        headers: branches,
+        dataStartRow: rowStop,
+        columns: columnData,
+    }
+}
+
+function scalarToSendable(val: any): Sendable {
+    if (typeof val === 'string' ||
+        typeof val === 'number' ||
+        typeof val === 'boolean' ||
+        typeof val === 'undefined') 
+    {
+        return val;
+    } else if (Date.prototype.isPrototypeOf(val)) {
+        return (val as Date).getTime();
+    }
 }

@@ -7,6 +7,8 @@
     <button onclick="test00a()">Test 0a</button>
     <button onclick="test01a()">Test 1a</button>
 
+    <button onclick="getData()">Get data</button>
+
     <textarea id="debug" cols="20" rows="5"></textarea>
 
     <script>
@@ -30,6 +32,18 @@
             return function(e) {
                 document.getElementById('debug').value = headline + String(e);
             }
+        }
+
+        function getData() {
+          document.getElementById('debug').value = 'getting data...';
+            google.script.run
+            .withSuccessHandler(getHandler("Success:\n"))
+            .withFailureHandler(getHandler("Failure:\n"))
+            .readData();
+        }
+
+        function useData() {
+
         }
     </script>
   </body>
