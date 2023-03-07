@@ -1,94 +1,26 @@
 // Code used both server-side and client-side
 
-class Table<T extends MetaTagged> {
+abstract class Table<T extends MetaTagged> {
     private ctor: { new (): T };
-    private cache: T[] = [];
+    protected cache: T[] = [];
     readonly indexKey: string | undefined;
     readonly index: Map<string, number> = new Map();
-    readonly sheet?: Sheet;
     headers: HeaderNode;
     dataRowStart: number;
     dataRowStop: number;
-    readRow?(row: number): any[] | undefined;
-    writeRow?(row: number, vals: any[]): void;
-    fetchData?(rowStart: number, rowStop: number): Promise<void>;
 
-    constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode);
-    constructor(ctor: { new (): T }, sheet: SheetData);
-    constructor(ctor: { new (): T }, sheet: Sheet | SheetData, headers?: HeaderNode | string[]) {
+    abstract readRow?(row: number): any[] | undefined;
+    writeRow?(row: number, vals: any[]): void;
+
+    constructor(ctor: { new (): T }, headers: HeaderNode, dataRowStop: number, dataRowStart?: number) {
         this.ctor = ctor;
-        this.indexKey = ctor.prototype.index;
-        
-        if ('getRange' in sheet) {
-            this.sheet = sheet;
-            this.headers = headers as HeaderNode;
-            this.dataRowStart = getMaxRow(this.headers) + 1;
-            const data = Region.fromSheet(sheet).resize(this.dataRowStart);
-            this.dataRowStop = data.rowStop;
-            this.readRow = function(row: number): any[] | undefined {
-                return data.readRow(row);
-            }
-            const captureThis = this;
-            this.writeRow = function(row: number, vals: any[]): void {
-                const { rowStop } = data.writeRow(row, vals, 'encroach');
-                captureThis.dataRowStop = rowStop;
-            }
-        } else {
-            const ui = SpreadsheetApp.getUi();
-            this.dataRowStart = getMaxRow({ row: 1, children: sheet.headers }) + 1;
-            const headerTree = getHeaderTree(new ctor(), sheet.headers, this.dataRowStart);
-            if (headerTree === undefined) throw new Error('failed to parse headers');
-            this.headers = headerTree;
-            let maxColLen = 0;
-            ui.alert(JSON.stringify(sheet.columns));
-            for (const col of sheet.columns) {
-                if (col && col.length > maxColLen) maxColLen = col.length;
-            }
-            this.dataRowStop = maxColLen + 1;
-            this.readRow = function(row: number): any[] | undefined {
-                return sheet.columns.map(col => col[row - 1]);
-            };
-            const includeColumns: number[] = [];
-            for (const c of this.headers.children) {
-                for (let i = c.colStart; i < c.colStop; i++) includeColumns.push(i);
-            }
-            this.fetchData = function(rowStart: number, rowStop?: number): Promise<void> {
-                let successHandler: (data: SheetColumns) => void = function () {};
-                let failureHandle: (e: any) => void;
-                const captureThis = this;
-                const promise = new Promise<void>((res, rej) => {
-                    successHandler = function(data: SheetColumns) {
-                        captureThis.readRow = function(row: number): any[] | undefined {
-                            return data.columns.map(col => col[row - 1]);
-                        };
-                        rowStop ??= captureThis.dataRowStop;
-                        for (let i = rowStart - captureThis.dataRowStart; i < rowStop - captureThis.dataRowStart; i++) {
-                            delete captureThis.cache[i];
-                        }
-                        res();
-                    };
-                    failureHandle = function(e) { 
-                        rej(e);
-                    };
-                });
-                const data = getSheetColumns({
-                        url: sheet.url,
-                        sheetName: sheet.sheetName,
-                    }, includeColumns, rowStart, rowStop);
-                successHandler(data);
-                return promise;
-            }
-            // for (let i = 0; i < this.dataRowStop - this.dataRowStart; i++) {
-            //     const vals = sheet.columns.map(col => col[i + this.dataRowStart - 1]);
-            //     const obj = new ctor();
-            //     applyRowValues(obj, vals, headerTree);
-            //     this.cache[i] = obj;
-            // }
-        }
-        this.initIndex();
+        this.indexKey = ctor.prototype[META].index;
+        this.headers = headers;
+        this.dataRowStart = dataRowStart ?? getMaxRow(this.headers) + 1;
+        this.dataRowStop = dataRowStop;
     }
 
-    private initIndex() {
+    protected initIndex() {
         if (!this.indexKey) return;
         this.index.clear();
         for (let row = this.dataRowStart; row < this.dataRowStop; row++) {

@@ -2,7 +2,10 @@ type Sheet = GoogleAppsScript.Spreadsheet.Sheet;
 type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
 
 function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
-    return class TypedTable extends Table<T> {
+    return class ServerTable extends Table<T> {
+        private sheet: Sheet;
+        private data: Region;
+        
         constructor(spreadSheet: Spreadsheet, data?: T[]);
         constructor(sheet: Sheet);
         constructor(doc: Spreadsheet | Sheet, data?: T[]) {
@@ -19,7 +22,20 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
                 if (!r) throw new Error('Error reading table headers.');
                 headers = r;
             }
-            super(Constructor, sheet, headers);
+            const region = Region.fromSheet(sheet);
+            super(Constructor, headers, region.rowStop);
+            this.sheet = sheet;
+            this.data = region;
+            this.initIndex();
+        }
+
+        readRow(row: number): any[] | undefined {
+            return this.data.readRow(row);
+        }
+
+        writeRow(row: number, vals: any[]): void {
+            const { rowStop } = this.data.writeRow(row, vals, 'encroach');
+            this.dataRowStop = rowStop;
         }
     };
 }
