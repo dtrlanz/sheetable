@@ -27,7 +27,7 @@ function test01a() {
     const { sheet } = new Book.Table(spreadsheet);
 
     const ui = SpreadsheetApp.getUi();
-    const table = new Book.Table(sheet);
+    const table = new Book.Table(sheet!);
     ui.alert(stringifyHeaders(table));
 }
 

@@ -24,33 +24,6 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
     };
 }
 
-function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
-    if (headers.children.length === 0 && 'key' in headers) {
-        const val = row[headers.colStart - 1];
-        if (typeof headers.key === 'string') {
-            if (headers.key in target) {
-                applyValue(target, headers.key, val);
-            }
-        } else {
-            if (Array.isArray(target[headers.key[0]])) {
-                applyValue(target[headers.key[0]], headers.key[1], val);
-            }
-        }
-    } else {
-        let obj = target;
-        if ('key' in headers) {
-            if (typeof headers.key === 'string') {
-                obj = target[headers.key];
-            } else {
-                obj = target[headers.key[0]][headers.key[1]];
-            }
-        }
-        for (const c of headers.children) {
-            applyRowValues(obj, row, c);
-        }
-    }
-}
-
 function fillRowValues(source: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
     if (headers.children.length === 0 && 'key' in headers) {
         let val: any;
@@ -82,10 +55,6 @@ function applyValue(target: any, propertyKey: string | number, val: any) {
     } else if (typeof target[propertyKey] === 'string') {
         target[propertyKey] = String(val);
     }
-}
-
-function getMaxRow(headers: HeaderNode): number {
-    return Math.max(headers.row, ...headers.children.map(c => getMaxRow(c)));
 }
 
 function label(value: string | string[]) {
@@ -158,6 +127,7 @@ interface HeaderNode {
     readonly colStop: number;
     readonly row: number;
     readonly children: HeaderChild[];
+    ignore?: boolean;
 }
 
 interface HeaderChild extends HeaderNode {
@@ -298,10 +268,10 @@ function getHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefine
     return getHeaderTree(obj, branches, rowStop);
 }
 
-function getHeadersForClient(walker: TableWalker): { branches: Branch[], rowStop: number } {
+function getHeadersForClient(walker: TableWalker): Branch[] {
     const { branches, rowStop } = getHeadersHelper(walker);
     trimBranches(branches, rowStop);
-    return { branches, rowStop };
+    return branches;
 
     function trimBranches(branches: Branch[], rowStop: number) {
         // assume children at the same level will always be in the same row
@@ -557,26 +527,31 @@ function getSheet(info: SheetInfo): { spreadsheet: Spreadsheet, sheet: Sheet } {
     return { spreadsheet, sheet};
 }
 
-interface SheetData {
+interface SheetData extends SheetColumns {
     url: string;
     sheetName: string;
     headers: Branch[];
-    dataStartRow: number;
-    columns: Sendable[][];
 }
 
-function getSheetData(info: SheetInfo = {}, columnLabels: string[] = []): SheetData {
+interface SheetColumns {
+    columns: Sendable[][];
+    rowOffset: number;
+}
+
+function getSheetData(info: SheetInfo = {}, columnLabels: string[], rowStart: number, rowStop?: number): SheetData {
     const { spreadsheet, sheet } = getSheet(info);
-    const region = Region.fromSheet(sheet);
-    const { branches, rowStop } = getHeadersForClient(new TableWalker(region));
+    const region = Region.fromSheet(sheet).resize(undefined, rowStop);
+    const branches = getHeadersForClient(new TableWalker(region));
 
     const columnData: Sendable[][] = [];
     for (const label of columnLabels) {
         for (const br of branches) {
             if (br.label === label) {
                 for (let col = br.start; col < br.stop; col++) {
-                    const walker = new TableWalker(region, br.row, col)
-                    columnData[col] = walker.map(1, 0, scalarToSendable);
+                    // note that column data will include header row(s)
+                    const walker = new TableWalker(region, rowStart, col)
+                    // use 0-indexed arrays for consistency
+                    columnData[col - 1] = walker.map(1, 0, scalarToSendable);
                 }
                 break;
             }
@@ -587,8 +562,25 @@ function getSheetData(info: SheetInfo = {}, columnLabels: string[] = []): SheetD
         url: spreadsheet.getUrl(),
         sheetName: sheet.getName(),
         headers: branches,
-        dataStartRow: rowStop,
         columns: columnData,
+        rowOffset: rowStart,
+    }
+}
+
+function getSheetColumns(info: SheetInfo = {}, columns: number[], rowStart: number, rowStop?: number): SheetColumns {
+    const { sheet } = getSheet(info);
+    const region = Region.fromSheet(sheet).resize(undefined, rowStop);
+
+    const columnData: Sendable[][] = [];
+    for (const col of columns) {
+        const walker = new TableWalker(region, rowStart, col)
+        // use 0-indexed arrays for consistency
+        columnData[col - 1] = walker.map(1, 0, scalarToSendable);
+    }
+    
+    return {
+        columns: columnData,
+        rowOffset: rowStart,
     }
 }
 

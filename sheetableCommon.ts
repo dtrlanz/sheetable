@@ -1,31 +1,97 @@
 // Code used both server-side and client-side
 
 class Table<T extends MetaTagged> {
-    readonly sheet: Sheet;
-    readonly orientation: Orientation;
     private ctor: { new (): T };
     private cache: T[] = [];
     readonly indexKey: string | undefined;
     readonly index: Map<string, number> = new Map();
+    readonly sheet?: Sheet;
     headers: HeaderNode;
-    data: Region;
+    dataRowStart: number;
+    dataRowStop: number;
+    readRow?(row: number): any[] | undefined;
+    writeRow?(row: number, vals: any[]): void;
+    fetchData?(rowStart: number, rowStop: number): Promise<void>;
 
-    constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode) {
+    constructor(ctor: { new (): T }, sheet: Sheet, headers: HeaderNode);
+    constructor(ctor: { new (): T }, sheet: SheetData);
+    constructor(ctor: { new (): T }, sheet: Sheet | SheetData, headers?: HeaderNode | string[]) {
         this.ctor = ctor;
-        this.sheet = sheet;
-        this.orientation = getOrientation(sheet);
-        this.headers = headers;
-        const firstDataRow = getMaxRow(headers) + 1;
-        this.data = Region.fromSheet(sheet).resize(firstDataRow);
-        const specimen = this.row(this.data.rowStart);
-        this.indexKey = specimen?.[META]?.index;
+        this.indexKey = ctor.prototype.index;
+        
+        if ('getRange' in sheet) {
+            this.sheet = sheet;
+            this.headers = headers as HeaderNode;
+            this.dataRowStart = getMaxRow(this.headers) + 1;
+            const data = Region.fromSheet(sheet).resize(this.dataRowStart);
+            this.dataRowStop = data.rowStop;
+            this.readRow = function(row: number): any[] | undefined {
+                return data.readRow(row);
+            }
+            const captureThis = this;
+            this.writeRow = function(row: number, vals: any[]): void {
+                const { rowStop } = data.writeRow(row, vals, 'encroach');
+                captureThis.dataRowStop = rowStop;
+            }
+        } else {
+            const ui = SpreadsheetApp.getUi();
+            this.dataRowStart = getMaxRow({ row: 1, children: sheet.headers }) + 1;
+            const headerTree = getHeaderTree(new ctor(), sheet.headers, this.dataRowStart);
+            if (headerTree === undefined) throw new Error('failed to parse headers');
+            this.headers = headerTree;
+            let maxColLen = 0;
+            ui.alert(JSON.stringify(sheet.columns));
+            for (const col of sheet.columns) {
+                if (col && col.length > maxColLen) maxColLen = col.length;
+            }
+            this.dataRowStop = maxColLen + 1;
+            this.readRow = function(row: number): any[] | undefined {
+                return sheet.columns.map(col => col[row - 1]);
+            };
+            const includeColumns: number[] = [];
+            for (const c of this.headers.children) {
+                for (let i = c.colStart; i < c.colStop; i++) includeColumns.push(i);
+            }
+            this.fetchData = function(rowStart: number, rowStop?: number): Promise<void> {
+                let successHandler: (data: SheetColumns) => void = function () {};
+                let failureHandle: (e: any) => void;
+                const captureThis = this;
+                const promise = new Promise<void>((res, rej) => {
+                    successHandler = function(data: SheetColumns) {
+                        captureThis.readRow = function(row: number): any[] | undefined {
+                            return data.columns.map(col => col[row - 1]);
+                        };
+                        rowStop ??= captureThis.dataRowStop;
+                        for (let i = rowStart - captureThis.dataRowStart; i < rowStop - captureThis.dataRowStart; i++) {
+                            delete captureThis.cache[i];
+                        }
+                        res();
+                    };
+                    failureHandle = function(e) { 
+                        rej(e);
+                    };
+                });
+                const data = getSheetColumns({
+                        url: sheet.url,
+                        sheetName: sheet.sheetName,
+                    }, includeColumns, rowStart, rowStop);
+                successHandler(data);
+                return promise;
+            }
+            // for (let i = 0; i < this.dataRowStop - this.dataRowStart; i++) {
+            //     const vals = sheet.columns.map(col => col[i + this.dataRowStart - 1]);
+            //     const obj = new ctor();
+            //     applyRowValues(obj, vals, headerTree);
+            //     this.cache[i] = obj;
+            // }
+        }
         this.initIndex();
     }
 
     private initIndex() {
         if (!this.indexKey) return;
         this.index.clear();
-        for (let row = this.data.rowStart; row < this.data.rowStop; row++) {
+        for (let row = this.dataRowStart; row < this.dataRowStop; row++) {
             const entry = this.row(row);
             if (entry?.[this.indexKey])
                 this.index.set(String(entry[this.indexKey]), row);
@@ -33,15 +99,15 @@ class Table<T extends MetaTagged> {
     }
 
     row(row: number, refresh?: boolean): T | undefined {
-        const cached = this.cache[row - this.data.rowStart];
+        const cached = this.cache[row - this.dataRowStart];
         if (cached && !refresh) return cached;
 
-        const vals = this.data.readRow(row);
+        const vals = this.readRow?.(row);
         if (!vals) return undefined;
 
         const obj = new this.ctor();
         applyRowValues(obj, vals, this.headers);
-        this.cache[row - this.data.rowStart] = obj;
+        this.cache[row - this.dataRowStart] = obj;
         return obj;
     }
 
@@ -67,15 +133,15 @@ class Table<T extends MetaTagged> {
             strIdx = typeof idx === 'string' ? strIdx = idx 
                                              : this.getIndex(idx);
             idxRow = strIdx !== undefined ? this.index.get(strIdx) : undefined;
-            row = idxRow ?? this.data.rowStop;
+            row = idxRow ?? this.dataRowStop;
         }
         entry ??= typeof idx === 'object' ? idx : {};
         const vals: any[] = [];
         fillRowValues(entry, vals, this.headers);
-        this.data = this.data.writeRow(row, vals, 'encroach');
+        this.writeRow?.(row, vals);
         if (strIdx && idxRow !== row)
             this.index.set(strIdx, row);
-        delete this.cache[row];
+        applyRowValues(this.cache[row], vals, this.headers);
     }
 
     private getIndex(entry: Partial<T>): string | undefined {
@@ -86,6 +152,32 @@ class Table<T extends MetaTagged> {
     }
 }
 
+function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
+    if (headers.children.length === 0 && 'key' in headers) {
+        const val = row[headers.colStart - 1];
+        if (typeof headers.key === 'string') {
+            if (headers.key in target) {
+                applyValue(target, headers.key, val);
+            }
+        } else {
+            if (Array.isArray(target[headers.key[0]])) {
+                applyValue(target[headers.key[0]], headers.key[1], val);
+            }
+        }
+    } else {
+        let obj = target;
+        if ('key' in headers) {
+            if (typeof headers.key === 'string') {
+                obj = target[headers.key];
+            } else {
+                obj = target[headers.key[0]][headers.key[1]];
+            }
+        }
+        for (const c of headers.children) {
+            applyRowValues(obj, row, c);
+        }
+    }
+}
 
 function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): HeaderNode | undefined {
     // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
@@ -137,5 +229,14 @@ function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): He
         root.children.push(node);
     }
     return root;
+}
+
+interface WithRow {
+    row: number;
+    children: WithRow[];
+}
+
+function getMaxRow(headers: WithRow): number {
+    return Math.max(headers.row, ...headers.children.map(c => getMaxRow(c)));
 }
 
