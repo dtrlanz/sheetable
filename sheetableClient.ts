@@ -8,7 +8,7 @@ function sheetableClient<T extends MetaTagged>(Constructor: { new (): T }) {
         private colData: SheetColumns;
         private includeCols: number[];
 
-        constructor(data: SheetData) {
+        private constructor(data: SheetData) {
             let maxColLen = 0;
             for (const col of data.columns) {
                 if (col && col.length > maxColLen) maxColLen = col.length;
@@ -28,7 +28,7 @@ function sheetableClient<T extends MetaTagged>(Constructor: { new (): T }) {
             this.initIndex();
         }
 
-        static getTable(sheet: SheetInfo, columnLabels?: string[]): Promise<ClientTable> {
+        static open(sheet: SheetInfo, columnLabels?: string[]): Promise<ClientTable> {
             let successHandler: (data: SheetData) => void = function () {};
             let failureHandle: (e: any) => void;
             const promise = new Promise<ClientTable>((res, rej) => {
@@ -72,7 +72,6 @@ function sheetableClient<T extends MetaTagged>(Constructor: { new (): T }) {
             const data = getSheetColumns(this.sheetInfo, this.includeCols, rowStart, rowStop);
             successHandler(data);
             return promise;
-        }        
-
+        }
     };
 }

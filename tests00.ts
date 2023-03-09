@@ -14,5 +14,5 @@ class Pet {
 
 function test00a() {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const pets = new Pet.Table(spreadsheet, [new Pet()]);
+    const pets = Pet.Table.create(spreadsheet, [new Pet()]);
 }

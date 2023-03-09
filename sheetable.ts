@@ -3,30 +3,29 @@ type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
 
 function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
     return class ServerTable extends Table<T> {
-        private sheet: Sheet;
+        readonly sheet: Sheet;
         private data: Region;
         
-        constructor(spreadSheet: Spreadsheet, data?: T[]);
-        constructor(sheet: Sheet);
-        constructor(doc: Spreadsheet | Sheet, data?: T[]) {
-            let sheet: Sheet;
-            let headers: HeaderNode;
-            if ('insertSheet' in doc) {
-                sheet = doc.insertSheet();
-                const specimen = data?.[0] ?? new Constructor();
-                headers = createHeaders(specimen, 1, 1);
-                writeHeaders(headers, sheet);
-            } else {
-                sheet = doc;
-                const r = getHeaders(TableWalker.fromSheet(sheet), new Constructor());
-                if (!r) throw new Error('Error reading table headers.');
-                headers = r;
-            }
+        private constructor(sheet: Sheet, headers: HeaderNode) {
             const region = Region.fromSheet(sheet);
             super(Constructor, headers, region.rowStop);
             this.sheet = sheet;
             this.data = region;
             this.initIndex();
+        }
+
+        static open(sheet: Sheet): ServerTable {
+            const headers = getHeaders(TableWalker.fromSheet(sheet), new Constructor());
+            if (!headers) throw new Error('Error reading table headers.');
+            return new ServerTable(sheet, headers);
+        }
+
+        static create(spreadsheet: Spreadsheet, data: T[] = []): ServerTable {
+            const sheet = spreadsheet.insertSheet();
+            const specimen = data?.[0] ?? new Constructor();
+            const headers = createHeaders(specimen, 1, 1);
+            writeHeaders(headers, sheet);
+            return new ServerTable(sheet, headers);
         }
 
         readRow(row: number): any[] | undefined {

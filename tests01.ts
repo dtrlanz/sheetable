@@ -24,10 +24,10 @@ class Person {
 
 function test01a() {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const { sheet } = new Book.Table(spreadsheet);
+    const { sheet } = Book.Table.create(spreadsheet);
 
     const ui = SpreadsheetApp.getUi();
-    const table = new Book.Table(sheet!);
+    const table = Book.Table.open(sheet!);
     ui.alert(stringifyHeaders(table));
 }
 
@@ -41,6 +41,6 @@ function test01b() {
         Jane Eyre             | Charlotte  | Brontë       | 1847
         The Great Gatsby      | F. Scott   | Fitzgerald   | 1925
     `);
-    const table = new Book.Table(sheet);
+    const table = Book.Table.open(sheet);
     ui.alert(stringifyHeaders(table));
 }

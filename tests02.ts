@@ -7,7 +7,7 @@ function test02a() {
         goldfish | Bob    | 1
         dog      | Karl   | 6
     `);
-    const table = new Pet.Table(sheet);
+    const table = Pet.Table.open(sheet);
 
     const ui = SpreadsheetApp.getUi();
     const r3 = table.row(3);
@@ -23,7 +23,7 @@ function test02b() {
         Jane Eyre             | Charlotte  | Brontë       | 1847
         The Great Gatsby      | F. Scott   | Fitzgerald   | 1925
     `);
-    const table = new Book.Table(sheet);
+    const table = Book.Table.open(sheet);
 
     const ui = SpreadsheetApp.getUi();
     const r4 = table.row(4);
@@ -40,7 +40,7 @@ function test02c() {
         goldfish | Bob    | 1
         dog      | Karl   | 6
     `);
-    const table = new Pet.Table(sheet);
+    const table = Pet.Table.open(sheet);
 
     const ui = SpreadsheetApp.getUi();
     const fluffy = table.get('Fluffy');
@@ -72,7 +72,7 @@ function test02d() {
         goldfish | Bob    | 1
         dog      | Karl   | 6
     `);
-    const table = new Pet.Table(sheet);
+    const table = Pet.Table.open(sheet);
 
     const fluffy = table.get('Fluffy')!;
     fluffy.age = 6;
@@ -87,7 +87,7 @@ function test02e() {
         goldfish | Bob    | 1
         dog      | Karl   | 6
     `);
-    const table = new Pet.Table(sheet);
+    const table = Pet.Table.open(sheet);
 
     const fluffy = table.get('Fluffy')!;
     fluffy.age = 6;
