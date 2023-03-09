@@ -39,54 +39,6 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
     };
 }
 
-function label(value: string | string[]) {
-    return function (target: MetaTagged, propertyKey: string) {
-        const l2k = configureProp(target, propertyKey, { label: value }).labelToKey;
-        if (typeof value === 'string') {
-            l2k.set(value, propertyKey);
-        } else {
-            for (let i = 0; i < value.length; i++) {
-                l2k.set(value[i], [propertyKey, i])
-            }
-        }
-    }
-}
-
-function index(target: MetaTagged, propertyKey: string) {
-    if (target[META]) {
-        target[META].index = propertyKey;
-        return;
-    }
-    target[META] = {
-        props: new Map(),
-        labelToKey: new Map(),
-        index: propertyKey,
-    };
-}
-
-function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], init?: () => any }) {
-    if (target[META] === undefined) {
-        target[META] = {
-            props: new Map(),
-            labelToKey: new Map(),
-        };
-    }
-    let prop = target[META].props.get(propertyKey);
-    if (!prop) {
-        target[META].props.set(propertyKey, options);
-    } else {
-        for (const k in options) {
-            (prop as any)[k] = (options as any)[k];
-        }
-    }
-    return target[META];
-}
-
-function labelToKey(obj: MetaTagged, label: any): string | [string, number] {
-    return obj[META]?.labelToKey.get(String(label)) ?? String(label);
-}
-
-const META: unique symbol = Symbol('sheetable metadata');
 
 interface MetaTagged {
     [META]?: {
@@ -579,4 +531,8 @@ function scalarToSendable(val: any): Sendable {
     } else if (Date.prototype.isPrototypeOf(val)) {
         return (val as Date).getTime();
     }
+}
+
+function include(filename: string) {
+    return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }

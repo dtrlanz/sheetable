@@ -1,6 +1,7 @@
 function onOpen() {
     SpreadsheetApp.getUi()
     .createMenu('Tests')
+    .addItem('Open sidebar', 'testSidebar')
     .addItem('Test 0a', 'test00a')
     .addItem('Test 1a', 'test01a')
     .addItem('Test 1b', 'test01b')
@@ -13,7 +14,6 @@ function onOpen() {
     .addItem('Test 3b', 'test03b')
     .addItem('Test 3c', 'test03c')
     .addItem('Delete other sheets', 'delSheets')
-    .addItem('Open sidebar', 'testSidebar')
     .addToUi();
 }
 
@@ -68,11 +68,24 @@ function stringifyHeaders<T extends MetaTagged>(table: Table<T>): string {
 }
 
 function testSidebar() {
-    const sidebar = HtmlService.createTemplateFromFile('test');
+    const sidebar = HtmlService.createTemplateFromFile('testClient');
     sidebar.docId = SpreadsheetApp.getActiveSpreadsheet().getId();
     const html = sidebar.evaluate().setTitle('Test Sidebar');
     SpreadsheetApp.getUi().showSidebar(html);
 }
+
+function makePetList(): string {
+    const sheet = newSheet(`
+        Species  | Name   | Age
+        dog      | Fluffy | 5
+        cat      | Billy  | 3
+        goldfish | Bob    | 1
+        dog      | Karl   | 6
+    `);
+    return sheet.getSheetName();
+}
+
+
 
 function doGet() {
     const sidebar = HtmlService.createTemplateFromFile('test');

@@ -42,14 +42,16 @@ function sheetableClient<T extends MetaTagged>(Constructor: { new (): T }) {
             })
 
             columnLabels ??= typeof indexLabel === 'string' ? [indexLabel] : [];
-            const data = getSheetData(sheet, columnLabels, 1);
-            successHandler(data);
+            google.script.run
+                .withSuccessHandler(successHandler)
+                .withFailureHandler((e) => log('failed to open table: ' +String(e)))
+                .getSheetData(sheet, columnLabels, 1);
 
             return promise;
         }
 
         readRow(row: number, checkState: CellCheck): any[] | undefined {
-            return this.colData.columns.map(col => col[row - this.colData.rowOffset]);
+            return this.colData.columns.map(col => col?.[row - this.colData.rowOffset]);
         };
 
         writeRow(row: number, vals: any[], checkState: CellCheck): void {
@@ -73,8 +75,11 @@ function sheetableClient<T extends MetaTagged>(Constructor: { new (): T }) {
                     rej(e);
                 };
             });
-            const data = getSheetColumns(this.sheetInfo, this.includeCols, rowStart, rowStop);
-            successHandler(data);
+            google.script.run
+                .withSuccessHandler(successHandler)
+                .withFailureHandler((e) => log('failed to open table: ' +String(e)))
+                .getSheetColumns(this.sheetInfo, this.includeCols, rowStart, rowStop);
+            
             return promise;
         }
     };

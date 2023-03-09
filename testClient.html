@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <?!= include('dist/SheetableClient'); ?>
+    <script>
+        "use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+class Pet {
+    constructor() {
+        this.species = '';
+        this.name = '';
+        this.age = 0;
+    }
+}
+Pet.Table = sheetableClient(Pet);
+__decorate([
+    label('Species')
+], Pet.prototype, "species", void 0);
+__decorate([
+    index,
+    label('Name')
+], Pet.prototype, "name", void 0);
+__decorate([
+    label('Age')
+], Pet.prototype, "age", void 0);
+    </script>
+  </head>
+  <body>
+    <p>
+        <select id="tests" multiple size="10"></select>
+    </p>
+    <p>
+        <button id="run" onclick="runTests()">Run</button>
+    </p>
+    <div id="output">
+    </div>
+    
+
+    <script>
+        log(typeof sheetableClient);
+        log(typeof Pet);
+        Pet.Table = sheetableClient(Pet);
+        log(typeof Pet.Table);
+
+        const docId = '<?= docId ?>';
+        const tests = [test00];
+
+        const testSelect = document.getElementById('tests');
+        for (let i = 0; i < tests.length; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = tests[i].name;
+            testSelect.appendChild(opt);
+        }
+
+        function runTests() {
+            log('running tests');
+            const options = testSelect.getElementsByTagName('option');
+            for (let i = 0; i < options.length; i++) {
+                log(i);
+                if (options[i].selected) {
+                    options[i].value;
+                    const test = tests[options[i].value];
+                    test();
+                }
+            }
+        }
+
+        function log(str) {
+            const p = document.createElement('p');
+            p.innerText = str;
+            document.getElementById('output').appendChild(p);
+        }
+
+        function test00() {
+            log('running test00');
+            log(typeof Pet);
+            log(typeof Pet.Table);
+
+            google.script.run
+                .withSuccessHandler(callback)
+                .withFailureHandler((e) => log(String(e)))
+                .makePetList();
+
+            async function callback(sheetName) {
+                log(sheetName);
+                log(typeof Pet.Table);
+                log(typeof Pet.Table.open);
+                const tablePromise = Pet.Table.open({ id: docId, sheetName: sheetName });
+                log('opening');
+                const table = await tablePromise;
+                log('done opening');
+                const r3 = table.getRow(3);
+                log(JSON.stringify(r3));
+
+                await table.fetchData(1, 6);
+                const r3b = table.getRow(3);
+                log(JSON.stringify(r3b));
+            }
+        }
+
+    </script>
+  </body>
+</html>

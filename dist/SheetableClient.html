@@ -1,29 +1,102 @@
+<script>
+// Compiled using undefined undefined (TypeScript 4.9.5)
+"use strict";
+function sheetableClient(Constructor) {
+    const meta = (new Constructor())[META];
+    const indexKey = meta?.index;
+    const indexLabel = indexKey ? meta?.props.get(indexKey)?.label : undefined;
+    return class ClientTable extends Table {
+        constructor(data) {
+            let maxColLen = 0;
+            for (const col of data.columns) {
+                if (col && col.length > maxColLen)
+                    maxColLen = col.length;
+            }
+            const dataRowStart = getMaxRow({ row: 1, children: data.headers }) + 1;
+            const headers = getHeaderTree(new Constructor(), data.headers, dataRowStart);
+            if (headers === undefined)
+                throw new Error('failed to parse headers');
+            super(Constructor, headers, maxColLen + 1, dataRowStart);
+            this.sheetInfo = data;
+            this.colData = data;
+            this.includeCols = [];
+            for (const c of this.headers.children) {
+                for (let i = c.colStart; i < c.colStop; i++)
+                    this.includeCols.push(i);
+            }
+            this.initIndex();
+        }
+        static open(sheet, columnLabels) {
+            let successHandler = function () { };
+            let failureHandle;
+            const promise = new Promise((res, rej) => {
+                successHandler = function (data) {
+                    const table = new ClientTable(data);
+                    res(table);
+                };
+                failureHandle = function (e) {
+                    rej(e);
+                };
+            });
+            columnLabels ?? (columnLabels = typeof indexLabel === 'string' ? [indexLabel] : []);
+            google.script.run
+                .withSuccessHandler(successHandler)
+                .withFailureHandler((e) => log('failed to open table: ' + String(e)))
+                .getSheetData(sheet, columnLabels, 1);
+            return promise;
+        }
+        readRow(row, checkState) {
+            return this.colData.columns.map(col => col?.[row - this.colData.rowOffset]);
+        }
+        ;
+        writeRow(row, vals, checkState) {
+            writeSheetRow(this.sheetInfo, row, vals, checkState);
+        }
+        fetchData(rowStart, rowStop) {
+            let successHandler = function () { };
+            let failureHandle;
+            const captureThis = this;
+            const promise = new Promise((res, rej) => {
+                successHandler = function (data) {
+                    captureThis.colData = data;
+                    rowStop ?? (rowStop = captureThis.dataRowStop);
+                    for (let i = rowStart - captureThis.dataRowStart; i < rowStop - captureThis.dataRowStart; i++) {
+                        delete captureThis.cache[i];
+                    }
+                    res();
+                };
+                failureHandle = function (e) {
+                    rej(e);
+                };
+            });
+            google.script.run
+                .withSuccessHandler(successHandler)
+                .withFailureHandler((e) => log('failed to open table: ' + String(e)))
+                .getSheetColumns(this.sheetInfo, this.includeCols, rowStart, rowStop);
+            return promise;
+        }
+    };
+}
+
+
+
+// Compiled using undefined undefined (TypeScript 4.9.5)
+"use strict";
 // Code used both server-side and client-side
-
-const META: unique symbol = Symbol('sheetable metadata');
-
-abstract class Table<T extends MetaTagged> {
-    private ctor: { new (): T };
-    protected cache: T[] = [];
-    readonly indexKey: string | undefined;
-    readonly index: Map<string, number> = new Map();
-    headers: HeaderNode;
-    dataRowStart: number;
-    dataRowStop: number;
-
-    abstract readRow(row: number, checkState?: CellCheck): any[] | undefined;
-    abstract writeRow(row: number, vals: any[], checkState?: CellCheck): void;
-
-    constructor(ctor: { new (): T }, headers: HeaderNode, dataRowStop: number, dataRowStart?: number) {
+const META = Symbol('sheetable metadata');
+class Table {
+    constructor(ctor, headers, dataRowStop, dataRowStart) {
+        this.cache = [];
+        this.index = new Map();
         this.ctor = ctor;
         this.indexKey = ctor.prototype[META].index;
         this.headers = headers;
         this.dataRowStart = dataRowStart ?? getMaxRow(this.headers) + 1;
         this.dataRowStop = dataRowStop;
     }
-
-    protected initIndex() {
-        if (!this.indexKey) return;
+    initIndex() {
+        if (!this.indexKey)
+            return;
         this.index.clear();
         for (let row = this.dataRowStart; row < this.dataRowStop; row++) {
             const entry = this.getRow(row);
@@ -31,85 +104,77 @@ abstract class Table<T extends MetaTagged> {
                 this.index.set(String(entry[this.indexKey]), row);
         }
     }
-
-    getRow(row: number, refresh?: boolean): T | undefined {
+    getRow(row, refresh) {
         const cached = this.cache[row - this.dataRowStart];
-        if (cached && !refresh) return cached;
-
+        if (cached && !refresh)
+            return cached;
         const vals = this.readRow(row);
-        if (!vals) return undefined;
-
+        if (!vals)
+            return undefined;
         const obj = new this.ctor();
         applyRowValues(obj, vals, this.headers);
         this.cache[row - this.dataRowStart] = obj;
         return obj;
     }
-
-    setRow(row: number, entry: Partial<T>): void {
+    setRow(row, entry) {
         // get or create row
         const obj = this.getRow(row) ?? (this.cache[row - this.dataRowStart] = new this.ctor());
         // update row
         assignDeep(entry, obj);
         // write row to sheet
-        const vals: any[] = [];
+        const vals = [];
         fillRowValues(obj, vals, this.headers);
         this.writeRow(row, vals);
     }
-
-    get(idx: string | Partial<T>, refresh?: boolean): T | undefined {
+    get(idx, refresh) {
         const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
-        if (strIdx === undefined) return undefined;
+        if (strIdx === undefined)
+            return undefined;
         const row = this.index.get(strIdx);
-        if (row === undefined) return undefined;
+        if (row === undefined)
+            return undefined;
         return this.getRow(row, refresh);
     }
-
-    set(idx: string | Partial<T>, entry: Partial<T>): void;
-    set(entry: Partial<T>): void;
-    set(idx: string | Partial<T>, entry?: Partial<T>) {
+    set(idx, entry) {
         const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
         if (strIdx === undefined) {
             throw new Error(`Index property '${this.indexKey}' not found in ${JSON.stringify(idx)}.`);
         }
-        entry ??= typeof idx === 'object' ? idx : {};
+        entry ?? (entry = typeof idx === 'object' ? idx : {});
         const row = this.index.get(strIdx) ?? this.dataRowStop;
         this.setRow(row, entry);
         this.index.set(strIdx, row);
     }
-
-    private getIndex(entry: Partial<T>): string | undefined {
-        if (!this.indexKey) return undefined;
-        const field = (entry as any)[this.indexKey];
-        if (field !== undefined) return String(field);
+    getIndex(entry) {
+        if (!this.indexKey)
+            return undefined;
+        const field = entry[this.indexKey];
+        if (field !== undefined)
+            return String(field);
         return undefined;
     }
 }
-
-interface CellCheck {
-    headerCells: number[],
-    headerValues: string[],
-    indexCells: number[],
-    indexCellValues: string[],
-}
-
-function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
+function applyRowValues(target, row, headers) {
     if (headers.children.length === 0 && 'key' in headers) {
         const val = row[headers.colStart - 1];
         if (typeof headers.key === 'string') {
             if (headers.key in target) {
                 applyValue(target, headers.key, val);
             }
-        } else {
+        }
+        else {
             if (Array.isArray(target[headers.key[0]])) {
                 applyValue(target[headers.key[0]], headers.key[1], val);
             }
         }
-    } else {
+    }
+    else {
         let obj = target;
         if ('key' in headers) {
             if (typeof headers.key === 'string') {
                 obj = target[headers.key];
-            } else {
+            }
+            else {
                 obj = target[headers.key[0]][headers.key[1]];
             }
         }
@@ -118,32 +183,35 @@ function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | He
         }
     }
 }
-
-function applyValue(target: any, propertyKey: string | number, val: any) {
-    if (val === undefined) return;
+function applyValue(target, propertyKey, val) {
+    if (val === undefined)
+        return;
     if (typeof target[propertyKey] === 'number' && typeof val === 'number') {
         target[propertyKey] = val;
-    } else if (typeof target[propertyKey] === 'string') {
+    }
+    else if (typeof target[propertyKey] === 'string') {
         target[propertyKey] = String(val);
     }
 }
-
-function fillRowValues(source: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
+function fillRowValues(source, row, headers) {
     if (headers.children.length === 0 && 'key' in headers) {
-        let val: any;
+        let val;
         if (typeof headers.key === 'string') {
             val = source[headers.key];
-        } else {
+        }
+        else {
             val = source[headers.key[0]][headers.key[1]];
         }
         if (val !== undefined)
             row[headers.colStart - 1] = val;
-    } else {
+    }
+    else {
         let obj = source;
         if ('key' in headers) {
             if (typeof headers.key === 'string') {
                 obj = source[headers.key];
-            } else {
+            }
+            else {
                 obj = source[headers.key[0]][headers.key[1]];
             }
         }
@@ -152,8 +220,7 @@ function fillRowValues(source: MetaTagged, row: any[], headers: HeaderNode | Hea
         }
     }
 }
-
-function assignDeep(source: any, target: any) {
+function assignDeep(source, target) {
     for (const k in source) {
         if (typeof source[k] === 'object' && !(source[k] instanceof Date)) {
             if (!target[k] || typeof target[k] !== 'object')
@@ -164,20 +231,19 @@ function assignDeep(source: any, target: any) {
         target[k] = source[k];
     }
 }
-
-function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): HeaderNode | undefined {
+function getHeaderTree(obj, branches, rowStop) {
     // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
-    if (branches.length === 0 || branches[0].row >= rowStop) return undefined;
-    const root: HeaderNode = {
+    if (branches.length === 0 || branches[0].row >= rowStop)
+        return undefined;
+    const root = {
         colStart: branches[0].start,
         colStop: branches[branches.length - 1].stop,
         row: branches[0].row,
         children: [],
     };
     for (const b of branches) {
-        let key: string | [string, number];
+        let key;
         key = labelToKey(obj, b.label);
-
         let item;
         if (typeof key === 'string') {
             if (obj[key] === undefined) {
@@ -187,9 +253,10 @@ function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): He
                 }
             }
             item = obj[key];
-        } else {
+        }
+        else {
             const [k, i] = key;
-            obj[k] ??= [];
+            obj[k] ?? (obj[k] = []);
             if (obj[k][i] === undefined) {
                 const init = obj[META]?.props.get(k)?.init;
                 if (init) {
@@ -198,12 +265,11 @@ function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): He
             }
             item = obj[k][i];
         }
-
         const node = {
             row: b.row,
             colStart: b.start,
             colStop: b.stop,
-            children: [] as HeaderChild[],
+            children: [],
             parent: root,
             key: key,
             label: b.label,
@@ -216,30 +282,23 @@ function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): He
     }
     return root;
 }
-
-interface WithRow {
-    row: number;
-    children: WithRow[];
-}
-
-function getMaxRow(headers: WithRow): number {
+function getMaxRow(headers) {
     return Math.max(headers.row, ...headers.children.map(c => getMaxRow(c)));
 }
-
-function label(value: string | string[]) {
-    return function (target: MetaTagged, propertyKey: string) {
+function label(value) {
+    return function (target, propertyKey) {
         const l2k = configureProp(target, propertyKey, { label: value }).labelToKey;
         if (typeof value === 'string') {
             l2k.set(value, propertyKey);
-        } else {
+        }
+        else {
             for (let i = 0; i < value.length; i++) {
-                l2k.set(value[i], [propertyKey, i])
+                l2k.set(value[i], [propertyKey, i]);
             }
         }
-    }
+    };
 }
-
-function index(target: MetaTagged, propertyKey: string) {
+function index(target, propertyKey) {
     if (target[META]) {
         target[META].index = propertyKey;
         return;
@@ -250,8 +309,7 @@ function index(target: MetaTagged, propertyKey: string) {
         index: propertyKey,
     };
 }
-
-function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], init?: () => any }) {
+function configureProp(target, propertyKey, options) {
     if (target[META] === undefined) {
         target[META] = {
             props: new Map(),
@@ -261,15 +319,17 @@ function configureProp(target: MetaTagged, propertyKey: string, options: { label
     let prop = target[META].props.get(propertyKey);
     if (!prop) {
         target[META].props.set(propertyKey, options);
-    } else {
+    }
+    else {
         for (const k in options) {
-            (prop as any)[k] = (options as any)[k];
+            prop[k] = options[k];
         }
     }
     return target[META];
 }
-
-function labelToKey(obj: MetaTagged, label: any): string | [string, number] {
+function labelToKey(obj, label) {
     return obj[META]?.labelToKey.get(String(label)) ?? String(label);
 }
 
+
+</script>
