@@ -24,13 +24,13 @@ abstract class Table<T extends MetaTagged> {
         if (!this.indexKey) return;
         this.index.clear();
         for (let row = this.dataRowStart; row < this.dataRowStop; row++) {
-            const entry = this.row(row);
+            const entry = this.getRow(row);
             if (entry?.[this.indexKey])
                 this.index.set(String(entry[this.indexKey]), row);
         }
     }
 
-    row(row: number, refresh?: boolean): T | undefined {
+    getRow(row: number, refresh?: boolean): T | undefined {
         const cached = this.cache[row - this.dataRowStart];
         if (cached && !refresh) return cached;
 
@@ -43,42 +43,36 @@ abstract class Table<T extends MetaTagged> {
         return obj;
     }
 
-    get(idx: string | Partial<T>, refresh?: boolean): T | undefined {
-        const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
-        if (strIdx === undefined) return undefined;
-        const row = this.index.get(strIdx);
-        if (row === undefined) return undefined;
-        return this.row(row, refresh);
-    }
-
-    set(idx: string | Partial<T>, entry: Partial<T>): void;
-    set(row: number, entry: Partial<T>): void;
-    set(entry: Partial<T>): void;
-    set(idx: string | Partial<T> | number, entry?: Partial<T>) {
-        let strIdx: string | undefined; 
-        let row: number;
-        let idxRow: number | undefined;
-        if (typeof idx === 'number') {
-            strIdx = undefined;
-            row = idx;
-        } else {
-            strIdx = typeof idx === 'string' ? strIdx = idx 
-                                             : this.getIndex(idx);
-            idxRow = strIdx !== undefined ? this.index.get(strIdx) : undefined;
-            row = idxRow ?? this.dataRowStop;
-        }
-        entry ??= typeof idx === 'object' ? idx : {};
-
+    setRow(row: number, entry: Partial<T>): void {
         // get or create row
-        const obj = this.row(row) ?? (this.cache[row - this.dataRowStart] = new this.ctor());
+        const obj = this.getRow(row) ?? (this.cache[row - this.dataRowStart] = new this.ctor());
         // update row
         assignDeep(entry, obj);
         // write row to sheet
         const vals: any[] = [];
         fillRowValues(obj, vals, this.headers);
         this.writeRow(row, vals);
-        if (strIdx && idxRow !== row)
-            this.index.set(strIdx, row);
+    }
+
+    get(idx: string | Partial<T>, refresh?: boolean): T | undefined {
+        const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
+        if (strIdx === undefined) return undefined;
+        const row = this.index.get(strIdx);
+        if (row === undefined) return undefined;
+        return this.getRow(row, refresh);
+    }
+
+    set(idx: string | Partial<T>, entry: Partial<T>): void;
+    set(entry: Partial<T>): void;
+    set(idx: string | Partial<T>, entry?: Partial<T>) {
+        const strIdx = typeof idx === 'string' ? idx : this.getIndex(idx);
+        if (strIdx === undefined) {
+            throw new Error(`Index property '${this.indexKey}' not found in ${JSON.stringify(idx)}.`);
+        }
+        entry ??= typeof idx === 'object' ? idx : {};
+        const row = this.index.get(strIdx) ?? this.dataRowStop;
+        this.setRow(row, entry);
+        this.index.set(strIdx, row);
     }
 
     private getIndex(entry: Partial<T>): string | undefined {

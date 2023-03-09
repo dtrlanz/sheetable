@@ -10,7 +10,7 @@ function test02a() {
     const table = Pet.Table.open(sheet);
 
     const ui = SpreadsheetApp.getUi();
-    const r3 = table.row(3);
+    const r3 = table.getRow(3);
     ui.alert(JSON.stringify(r3));
 }
 
@@ -26,8 +26,8 @@ function test02b() {
     const table = Book.Table.open(sheet);
 
     const ui = SpreadsheetApp.getUi();
-    const r4 = table.row(4);
-    const r6 = table.row(6);
+    const r4 = table.getRow(4);
+    const r6 = table.getRow(6);
     ui.alert(JSON.stringify(r4));
     ui.alert(JSON.stringify(r6));
 }
