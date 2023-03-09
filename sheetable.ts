@@ -28,48 +28,15 @@ function sheetable<T extends MetaTagged>(Constructor: { new (): T }) {
             return new ServerTable(sheet, headers);
         }
 
-        readRow(row: number): any[] | undefined {
+        readRow(row: number, checkState: CellCheck): any[] | undefined {
             return this.data.readRow(row);
         }
 
-        writeRow(row: number, vals: any[]): void {
+        writeRow(row: number, vals: any[], checkState: CellCheck): void {
             const { rowStop } = this.data.writeRow(row, vals, 'encroach');
             this.dataRowStop = rowStop;
         }
     };
-}
-
-function fillRowValues(source: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
-    if (headers.children.length === 0 && 'key' in headers) {
-        let val: any;
-        if (typeof headers.key === 'string') {
-            val = source[headers.key];
-        } else {
-            val = source[headers.key[0]][headers.key[1]];
-        }
-        if (val !== undefined)
-            row[headers.colStart - 1] = val;
-    } else {
-        let obj = source;
-        if ('key' in headers) {
-            if (typeof headers.key === 'string') {
-                obj = source[headers.key];
-            } else {
-                obj = source[headers.key[0]][headers.key[1]];
-            }
-        }
-        for (const c of headers.children) {
-            fillRowValues(obj, row, c);
-        }
-    }
-}
-
-function applyValue(target: any, propertyKey: string | number, val: any) {
-    if (typeof target[propertyKey] === 'number' && typeof val === 'number') {
-        target[propertyKey] = val;
-    } else if (typeof target[propertyKey] === 'string') {
-        target[propertyKey] = String(val);
-    }
 }
 
 function label(value: string | string[]) {
@@ -336,21 +303,20 @@ class Region {
     readonly rowStart: number;
     readonly rowStop: number;
 
-    constructor(sheet: Sheet, rowStart: number, rowStop: number, colStart: number, colStop: number, orientation?: Orientation) {
+    constructor(sheet: Sheet, rowStart: number, rowStop: number, colStart: number, colStop: number, orientation: Orientation) {
         this.sheet = sheet;
-        this.orientation = orientation ?? getOrientation(sheet);
+        this.orientation = orientation;
         this.colStart = colStart;
         this.colStop = colStop;
         this.rowStart = rowStart;
         this.rowStop = rowStop;
     }
 
-    static fromSheet(sheet: Sheet): Region {
-        const orient = getOrientation(sheet);
+    static fromSheet(sheet: Sheet, orientation: Orientation = 'normal'): Region {
         let rowStop = sheet.getLastRow() + 1;
         let colStop = sheet.getLastColumn() + 1;
-        if (orient === 'transposed') [colStop, rowStop] = [rowStop, colStop];
-        return new Region(sheet, 1, rowStop, 1, colStop, orient);
+        if (orientation === 'transposed') [colStop, rowStop] = [rowStop, colStop];
+        return new Region(sheet, 1, rowStop, 1, colStop, orientation);
     }
 
     resize(rowStart?: number, rowStop?: number, colStart?: number, colStop?: number): Region {
@@ -461,7 +427,7 @@ class TableWalker {
         if (rowStart <= this.row && this.row < rowStop 
             && colStart <= this.col && this.col < colStop) 
         {
-            return new TableWalker(new Region(this.region.sheet, rowStart, rowStop, 1, colStop), this.row, this.col);
+            return new TableWalker(new Region(this.region.sheet, rowStart, rowStop, 1, colStop, this.region.orientation), this.row, this.col);
         }
         return undefined;
     }
@@ -502,22 +468,16 @@ class TableWalker {
 
 type Orientation = 'normal' | 'transposed';
 
-function getOrientation(sheet: Sheet): Orientation {
-    const v = sheet.getRange(1, 1).getValue();
-    if (typeof v === 'string' && v.substring(0, 2) === '>>') 
-        return 'transposed';
-    return 'normal';
-}
-
 type Sendable = boolean | number | string | null | undefined | { [K: string]: Sendable };
 
 interface SheetInfo {
     url?: string;
     id?: string;
     sheetName?: string;
+    orientation?: Orientation;
 }
 
-function getSheet(info: SheetInfo): { spreadsheet: Spreadsheet, sheet: Sheet } {
+function getSheet(info: SheetInfo): { spreadsheet: Spreadsheet, sheet: Sheet, orientation: Orientation } {
     let spreadsheet: Spreadsheet;
     let sheet: Sheet;
     if (!info.url && !info.id) {
@@ -539,12 +499,14 @@ function getSheet(info: SheetInfo): { spreadsheet: Spreadsheet, sheet: Sheet } {
     } else {
         sheet = spreadsheet.getSheets()[0];
     }
-    return { spreadsheet, sheet};
+    const orientation = info.orientation === 'transposed' ? 'transposed' : 'normal';
+    return { spreadsheet, sheet, orientation };
 }
 
 interface SheetData extends SheetColumns {
     url: string;
     sheetName: string;
+    orientation: Orientation;
     headers: Branch[];
 }
 
@@ -554,8 +516,8 @@ interface SheetColumns {
 }
 
 function getSheetData(info: SheetInfo = {}, columnLabels: string[], rowStart: number, rowStop?: number): SheetData {
-    const { spreadsheet, sheet } = getSheet(info);
-    const region = Region.fromSheet(sheet).resize(undefined, rowStop);
+    const { spreadsheet, sheet, orientation } = getSheet(info);
+    const region = Region.fromSheet(sheet, orientation).resize(undefined, rowStop);
     const branches = getHeadersForClient(new TableWalker(region));
 
     const columnData: Sendable[][] = [];
@@ -576,6 +538,7 @@ function getSheetData(info: SheetInfo = {}, columnLabels: string[], rowStart: nu
     return {
         url: spreadsheet.getUrl(),
         sheetName: sheet.getName(),
+        orientation: orientation,
         headers: branches,
         columns: columnData,
         rowOffset: rowStart,
@@ -583,8 +546,8 @@ function getSheetData(info: SheetInfo = {}, columnLabels: string[], rowStart: nu
 }
 
 function getSheetColumns(info: SheetInfo = {}, columns: number[], rowStart: number, rowStop?: number): SheetColumns {
-    const { sheet } = getSheet(info);
-    const region = Region.fromSheet(sheet).resize(undefined, rowStop);
+    const { sheet, orientation } = getSheet(info);
+    const region = Region.fromSheet(sheet, orientation).resize(undefined, rowStop);
 
     const columnData: Sendable[][] = [];
     for (const col of columns) {
@@ -597,6 +560,13 @@ function getSheetColumns(info: SheetInfo = {}, columns: number[], rowStart: numb
         columns: columnData,
         rowOffset: rowStart,
     }
+}
+
+function writeSheetRow(info: SheetInfo, row: number, vals: Sendable[], checkState?: CellCheck) {
+    const { sheet, orientation } = getSheet(info);
+    const region = Region.fromSheet(sheet, orientation);
+    region.writeRow(row, vals, 'encroach');
+
 }
 
 function scalarToSendable(val: any): Sendable {

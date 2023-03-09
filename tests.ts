@@ -11,6 +11,7 @@ function onOpen() {
     .addItem('Test 2e', 'test02e')
     .addItem('Test 3a', 'test03a')
     .addItem('Test 3b', 'test03b')
+    .addItem('Test 3c', 'test03c')
     .addItem('Delete other sheets', 'delSheets')
     .addItem('Open sidebar', 'testSidebar')
     .addToUi();

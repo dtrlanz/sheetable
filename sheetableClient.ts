@@ -48,9 +48,13 @@ function sheetableClient<T extends MetaTagged>(Constructor: { new (): T }) {
             return promise;
         }
 
-        readRow(row: number): any[] | undefined {
+        readRow(row: number, checkState: CellCheck): any[] | undefined {
             return this.colData.columns.map(col => col[row - this.colData.rowOffset]);
         };
+
+        writeRow(row: number, vals: any[], checkState: CellCheck): void {
+            writeSheetRow(this.sheetInfo, row, vals, checkState);
+        }
 
         fetchData(rowStart: number, rowStop?: number): Promise<void> {
             let successHandler: (data: SheetColumns) => void = function () {};

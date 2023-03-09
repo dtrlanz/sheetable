@@ -9,8 +9,8 @@ abstract class Table<T extends MetaTagged> {
     dataRowStart: number;
     dataRowStop: number;
 
-    abstract readRow?(row: number): any[] | undefined;
-    writeRow?(row: number, vals: any[]): void;
+    abstract readRow(row: number, checkState?: CellCheck): any[] | undefined;
+    abstract writeRow(row: number, vals: any[], checkState?: CellCheck): void;
 
     constructor(ctor: { new (): T }, headers: HeaderNode, dataRowStop: number, dataRowStart?: number) {
         this.ctor = ctor;
@@ -34,7 +34,7 @@ abstract class Table<T extends MetaTagged> {
         const cached = this.cache[row - this.dataRowStart];
         if (cached && !refresh) return cached;
 
-        const vals = this.readRow?.(row);
+        const vals = this.readRow(row);
         if (!vals) return undefined;
 
         const obj = new this.ctor();
@@ -68,12 +68,17 @@ abstract class Table<T extends MetaTagged> {
             row = idxRow ?? this.dataRowStop;
         }
         entry ??= typeof idx === 'object' ? idx : {};
+
+        // get or create row
+        const obj = this.row(row) ?? (this.cache[row - this.dataRowStart] = new this.ctor());
+        // update row
+        assignDeep(entry, obj);
+        // write row to sheet
         const vals: any[] = [];
-        fillRowValues(entry, vals, this.headers);
-        this.writeRow?.(row, vals);
+        fillRowValues(obj, vals, this.headers);
+        this.writeRow(row, vals);
         if (strIdx && idxRow !== row)
             this.index.set(strIdx, row);
-        applyRowValues(this.cache[row], vals, this.headers);
     }
 
     private getIndex(entry: Partial<T>): string | undefined {
@@ -82,6 +87,13 @@ abstract class Table<T extends MetaTagged> {
         if (field !== undefined) return String(field);
         return undefined;
     }
+}
+
+interface CellCheck {
+    headerCells: number[],
+    headerValues: string[],
+    indexCells: number[],
+    indexCellValues: string[],
 }
 
 function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
@@ -108,6 +120,52 @@ function applyRowValues(target: MetaTagged, row: any[], headers: HeaderNode | He
         for (const c of headers.children) {
             applyRowValues(obj, row, c);
         }
+    }
+}
+
+function applyValue(target: any, propertyKey: string | number, val: any) {
+    if (val === undefined) return;
+    if (typeof target[propertyKey] === 'number' && typeof val === 'number') {
+        target[propertyKey] = val;
+    } else if (typeof target[propertyKey] === 'string') {
+        target[propertyKey] = String(val);
+    }
+}
+
+function fillRowValues(source: MetaTagged, row: any[], headers: HeaderNode | HeaderChild) {
+    if (headers.children.length === 0 && 'key' in headers) {
+        let val: any;
+        if (typeof headers.key === 'string') {
+            val = source[headers.key];
+        } else {
+            val = source[headers.key[0]][headers.key[1]];
+        }
+        if (val !== undefined)
+            row[headers.colStart - 1] = val;
+    } else {
+        let obj = source;
+        if ('key' in headers) {
+            if (typeof headers.key === 'string') {
+                obj = source[headers.key];
+            } else {
+                obj = source[headers.key[0]][headers.key[1]];
+            }
+        }
+        for (const c of headers.children) {
+            fillRowValues(obj, row, c);
+        }
+    }
+}
+
+function assignDeep(source: any, target: any) {
+    for (const k in source) {
+        if (typeof source[k] === 'object' && !(source[k] instanceof Date)) {
+            if (!target[k] || typeof target[k] !== 'object')
+                target[k] = {};
+            assignDeep(source[k], target[k]);
+            continue;
+        }
+        target[k] = source[k];
     }
 }
 
