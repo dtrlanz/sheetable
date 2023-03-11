@@ -3,7 +3,7 @@
   <head>
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
     <?!= include('tests/testStyle'); ?>
-    <?!= requireLib(['sheetable', 'pet', 'tester']); ?>
+    <?!= requireLib(['sheetable', 'pet', 'tester', 'clientTests']); ?>
   </head>
   <body>
     <select id="tests" multiple size="8"></select>
@@ -16,14 +16,22 @@
 
     <script>
         const docId = '<?= docId ?>';
-        const tests = [test00];
 
+        const tests = [];
         const testSelect = document.getElementById('tests');
-        for (let i = 0; i < tests.length; i++) {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.innerText = tests[i].name;
-            testSelect.appendChild(opt);
+        populateTests();
+
+        function populateTests() {
+            for (const k in ClientTests) {
+                if (typeof ClientTests[k] === 'function') {
+                    const idx = tests.length;
+                    tests.push(ClientTests[k]);
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.innerText = ClientTests[k].name;
+                    testSelect.appendChild(opt);
+                }
+            }
         }
 
         function runTests() {
@@ -47,37 +55,6 @@
             output.replaceChildren();
         }
 
-        function log(str) {
-            const p = document.createElement('p');
-            p.innerText = str;
-            document.getElementById('output').appendChild(p);
-        }
-
-        function test00(tester) {
-            tester.log('running test00');
-
-            google.script.run
-                .withSuccessHandler(tester.wrapAsync(callback))
-                .withFailureHandler(e => tester.error(e))
-                .makePetList();
-
-            async function callback(sheetName) {
-                tester.log(sheetName);
-                const tablePromise = Pet.Table.open({ id: docId, sheetName: sheetName });
-                const table = await tablePromise;
-                const r3 = table.getRow(3);
-                tester.log(JSON.stringify(r3));
-                tester.assertEq(r3, {species:"",name:"",age:0});
-                //throw new Error('big problem here');
-
-                await table.fetchData(1, 6);
-                const r3b = table.getRow(3);
-                tester.log(JSON.stringify(r3b));
-                tester.assertEq(r3b, {species:"",name:"",age:0});
-
-                tester.pass();
-            }
-        }
     </script>
   </body>
 </html>

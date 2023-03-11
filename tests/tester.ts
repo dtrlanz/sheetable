@@ -47,7 +47,7 @@ class Tester {
         if (!assertion) this.error(msg);
     }
 
-    assertEq(a: any, b: any, msg: string | undefined) {
+    assertEq(a: any, b: any, msg?: string) {
         if (deepEq(a, b)) return;
         if (msg === undefined) {
             msg = 'Equality assertion failed:';
@@ -70,8 +70,8 @@ class Tester {
         }
     }
 
-    wrap<T, P extends []>(callback: (...args: P) => T): () => T {
-        return (...args: P) => {
+    wrap<F extends (...args: any[]) => any>(callback: F): () => ReturnType<F> {
+        return (...args: Parameters<F>) => {
             try {
                 return callback(...args);
             } catch(e) {
@@ -81,11 +81,11 @@ class Tester {
         };
     }
 
-    wrapAsync<T, P extends []>(callback: (...args: P) => Promise<T>): () => Promise<T> {
+    wrapAsync<T, F extends (...args: any[]) => Promise<T>>(callback: F): (...args: Parameters<F>) => Promise<T> {
         const captureThis = this;
-        return async function(...args: P) {
+        return async function(...args: Parameters<F>) {
             try {
-                return await callback(...args);
+                return callback(...args);
             } catch(e) {
                 captureThis.error(String(e));
                 throw e;
