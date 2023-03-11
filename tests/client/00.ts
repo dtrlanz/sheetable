@@ -7,7 +7,6 @@ namespace ClientTests {
 
         async function openTable(sheetName: string) {
             tester.log('created ' + sheetName);
-            tester.log('doc: ' + docId);
             const table = await Pet.Table.open({ id: docId, sheetName: sheetName });
             await fn(table);
             tester.pass();
@@ -29,17 +28,44 @@ namespace ClientTests {
         );
     }
 
-    export function simpleWrite(tester: Tester) {
+    export function setAfterFetch(tester: Tester) {
         test(tester,
             async function(table: Sheetable.Table<Pet>) {
+                await table.fetchData(1, 6);
+                tester.log('fetched data');
                 let val = table.getRow(3);
-                tester.log(JSON.stringify(val));
+                tester.assertEq(val, {species:"cat",name:"Billy",age:3});
+
                 const p = table.set('Billy', {age: 5});
                 tester.log('set completed on client');
                 val = table.getRow(3);
-                tester.log(JSON.stringify(val));
+                tester.assertEq(val, {species:"cat",name:"Billy",age:5});
+
                 await p;
                 tester.log('set completed on server');
+                await table.fetchData(1, 6);
+                val = table.getRow(3);
+                tester.assertEq(val, {species:"cat",name:"Billy",age:5});
+            }
+        );
+    }
+
+    export function setWithoutFetch(tester: Tester) {
+        test(tester,
+            async function(table: Sheetable.Table<Pet>) {
+                let val = table.getRow(3);
+                tester.assertEq(val, {species:"",name:"Billy",age:0});
+
+                const p = table.set('Billy', {age: 5});
+                tester.log('set completed on client');
+                val = table.getRow(3);
+                tester.assertEq(val, {species:"",name:"Billy",age:5});
+
+                await p;
+                tester.log('set completed on server');
+                await table.fetchData(1, 6);
+                val = table.getRow(3);
+                tester.assertEq(val, {species:"cat",name:"Billy",age:5});
             }
         );
     }
