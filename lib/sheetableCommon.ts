@@ -32,7 +32,6 @@ namespace Sheetable {
     export abstract class Table<T extends MetaTagged> {
         private ctor: { new (): T };
         protected cache: T[] = [];
-        readonly indexKey: string | undefined;
         readonly index: Map<string, number> = new Map();
         headers: HeaderNode;
         dataRowStart: number;
@@ -43,17 +42,24 @@ namespace Sheetable {
 
         constructor(ctor: { new (): T }, headers: HeaderNode, dataRowStop: number, dataRowStart?: number) {
             this.ctor = ctor;
-            this.indexKey = ctor.prototype[Sheetable.META].index;
             this.headers = headers;
             this.dataRowStart = dataRowStart ?? getMaxRow(this.headers) + 1;
             this.dataRowStop = dataRowStop;
         }
 
+        get indexKey(): string {
+            return this.ctor.prototype[Sheetable.META].index;
+        }
+
         protected initIndex() {
+            console.log('initIndex()');
+            console.log([this.dataRowStart, this.dataRowStop]);
             if (!this.indexKey) return;
             this.index.clear();
             for (let row = this.dataRowStart; row < this.dataRowStop; row++) {
                 const entry = this.getRow(row);
+                console.log(row);
+                console.log(JSON.stringify(entry));
                 if (entry?.[this.indexKey])
                     this.index.set(String(entry[this.indexKey]), row);
             }
@@ -267,8 +273,12 @@ namespace Sheetable {
     }
 
     export function index(target: MetaTagged, propertyKey: string) {
+        console.log('index: ' + propertyKey);
+        console.log(typeof target);
+        console.log(JSON.stringify(target));
         if (target[Sheetable.META]) {
             target[Sheetable.META].index = propertyKey;
+            console.log(JSON.stringify(target[Sheetable.META]));
             return;
         }
         target[Sheetable.META] = {
@@ -276,6 +286,7 @@ namespace Sheetable {
             labelToKey: new Map(),
             index: propertyKey,
         };
+        console.log(JSON.stringify(target[Sheetable.META]));
     }
 
     function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], init?: () => any }) {

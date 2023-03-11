@@ -2,10 +2,6 @@
 namespace Sheetable {
     export namespace Client {
         export function table<T extends Sheetable.MetaTagged>(Constructor: { new (): T }) {
-            const meta = (new Constructor())[Sheetable.META];
-            const indexKey = meta?.index;
-            const indexLabel = indexKey ? meta?.props.get(indexKey)?.label : undefined;
-
             return class ClientTable extends Sheetable.Table<T> {
                 private sheetInfo: Sheetable.SheetInfo;
                 private colData: Sheetable.SheetColumns;
@@ -44,6 +40,9 @@ namespace Sheetable {
                         };
                     })
 
+                    const meta = Constructor.prototype[Sheetable.META];
+                    const indexKey = meta?.index;
+                    const indexLabel = indexKey ? meta?.props.get(indexKey)?.label : undefined;
                     columnLabels ??= typeof indexLabel === 'string' ? [indexLabel] : [];
                     google.script.run
                         .withSuccessHandler(successHandler)
