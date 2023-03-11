@@ -11,7 +11,7 @@ class Tester {
                 createElement('span', [], name + ' '),
                 this.status = createElement('span', ['test-status'], '...')
             ]),
-            this.body = createElement('div', ['test-body', 'hidden'], [])
+            this.body = createElement('div', ['test-body'], [])
         ]);
         header.addEventListener('click', () => this.body.classList.toggle('hidden'));
         document.getElementById('test-output')?.appendChild(this.div);
@@ -21,6 +21,10 @@ class Tester {
         this.body.appendChild(
             createElement('p', [], msg)
         );
+    }
+
+    stringify(val: any) {
+        this.log(JSON.stringify(val));
     }
 
     error(msg: string) {
@@ -40,6 +44,7 @@ class Tester {
         if (this.status.innerText !== 'failed') {
             this.status.innerText = 'ok';
             this.div.classList.add('passed');
+            setTimeout(() => this.body.classList.add('hidden'), 1000);
         }
     }
 
@@ -50,12 +55,8 @@ class Tester {
     assertEq(a: any, b: any, msg?: string) {
         if (deepEq(a, b)) return;
         if (msg === undefined) {
-            msg = 'Equality assertion failed:';
-            if (typeof a !== 'object' || typeof b !== 'object') {
-                msg += ` ${a} !== ${b}`;
-            } else {
-                msg += `\n${JSON.stringify(a)}\n${JSON.stringify(b)}`;
-            }
+            msg = 'Equality assertion failed'
+                + `\nvalue:    ${JSON.stringify(a)}\nexpected: ${JSON.stringify(b)}`;
         }
         this.error(msg);
 
