@@ -5,16 +5,21 @@ function onOpen() {
     .addItem('Test 0a', 'test00a')
     .addItem('Test 1a', 'test01a')
     .addItem('Test 1b', 'test01b')
-    .addItem('Test 2a', 'test02a')
-    .addItem('Test 2b', 'test02b')
-    .addItem('Test 2c', 'test02c')
-    .addItem('Test 2d', 'test02d')
-    .addItem('Test 2e', 'test02e')
-    .addItem('Test 3a', 'test03a')
-    .addItem('Test 3b', 'test03b')
-    .addItem('Test 3c', 'test03c')
+    // .addItem('Test 2a', 'test02a')
+    // .addItem('Test 2b', 'test02b')
+    // .addItem('Test 2c', 'test02c')
+    // .addItem('Test 2d', 'test02d')
+    // .addItem('Test 2e', 'test02e')
+    // .addItem('Test 3a', 'test03a')
+    // .addItem('Test 3b', 'test03b')
+    // .addItem('Test 3c', 'test03c')
+    .addItem('Test requireLib', 'testRequireLib')
     .addItem('Delete other sheets', 'delSheets')
     .addToUi();
+}
+
+function testRequireLib() {
+    SpreadsheetApp.getUi().alert(requireLib(['sheetable']));
 }
 
 function delSheets() {
@@ -42,10 +47,10 @@ function newSheet(content: string = '') {
     return sheet;
 }
 
-function stringifyHeaders<T extends MetaTagged>(table: Table<T>): string {
+function stringifyHeaders<T extends Sheetable.MetaTagged>(table: Sheetable.Table<T>): string {
     return stringify(table.headers);
 
-    function stringify(headers: HeaderNode, level: number = 0): string {
+    function stringify(headers: Sheetable.HeaderNode, level: number = 0): string {
         let r = '';
         if ('label' in headers || 'key' in headers) {
             r += '--'.repeat(level);
@@ -68,7 +73,7 @@ function stringifyHeaders<T extends MetaTagged>(table: Table<T>): string {
 }
 
 function testSidebar() {
-    const sidebar = HtmlService.createTemplateFromFile('testClient');
+    const sidebar = HtmlService.createTemplateFromFile('tests/testClient');
     sidebar.docId = SpreadsheetApp.getActiveSpreadsheet().getId();
     const html = sidebar.evaluate().setTitle('Test Sidebar');
     SpreadsheetApp.getUi().showSidebar(html);

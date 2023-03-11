@@ -92,5 +92,5 @@ function test02e() {
     const fluffy = table.get('Fluffy')!;
     fluffy.age = 6;
     table.set('Fluffy', fluffy);
-    table.set(7, fluffy);
+    table.setRow(7, fluffy);
 }

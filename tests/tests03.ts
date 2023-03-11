@@ -8,7 +8,7 @@ async function test03a() {
         dog      | Karl   | 6
     `);
 
-    const PetTable = sheetableClient(Pet);
+    const PetTable = Sheetable.Client.table(Pet);
     const tablePromise = PetTable.open({ sheetName: sheet.getName() });
     const table = await tablePromise;
 
@@ -26,7 +26,7 @@ async function test03b() {
         dog      | Karl   | 6
     `);
 
-    const PetTable = sheetableClient(Pet);
+    const PetTable = Sheetable.Client.table(Pet);
     const tablePromise = PetTable.open({ sheetName: sheet.getName() });
     const table = await tablePromise;
 
@@ -54,7 +54,7 @@ async function test03c() {
         dog      | Karl   | 6
     `);
 
-    const PetTable = sheetableClient(Pet);
+    const PetTable = Sheetable.Client.table(Pet);
     const tablePromise = PetTable.open({ sheetName: sheet.getName() });
     const table = await tablePromise;
     await table.fetchData(1, 6);

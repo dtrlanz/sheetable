@@ -1,24 +1,24 @@
 class Book {
-    static Table = sheetable(Book);
+    static Table = Sheetable.table(Book);
 
-    @label('Title')
+    @Sheetable.label('Title')
     title: string = '';
 
-    @label('ISBN')
+    @Sheetable.label('ISBN')
     isbn: string = '';
     
-    @label(['Author 1', 'Author 2', 'Author 3'])
+    @Sheetable.label(['Author 1', 'Author 2', 'Author 3'])
     authors: Person[] = [new Person(), new Person(), new Person()];
     
-    @label('Date')
+    @Sheetable.label('Date')
     date: Date = new Date();
 }
 
 class Person {    
-    @label('First Name')
+    @Sheetable.label('First Name')
     firstName: string = '';
     
-    @label('Last Name')
+    @Sheetable.label('Last Name')
     lastName: string = '';
 }
 
