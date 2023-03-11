@@ -511,7 +511,3 @@ function scalarToSendable(val: any): Sheetable.Sendable {
         return (val as Date).getTime();
     }
 }
-
-function include(filename: string) {
-    return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}

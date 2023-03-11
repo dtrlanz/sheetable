@@ -1,23 +1,20 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <?!= requireLib(['sheetable', 'pet']); ?>
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <?!= include('tests/testStyle'); ?>
+    <?!= requireLib(['sheetable', 'pet', 'tester']); ?>
   </head>
   <body>
-    <p>
-        <select id="tests" multiple size="10"></select>
-    </p>
-    <p>
-        <button id="run" onclick="runTests()">Run</button>
-    </p>
-    <div id="output">
+    <select id="tests" multiple size="8"></select>
+    <div class="button-row">
+        <button id="run" class="action" onclick="runTests()">Run</button>
+        <button id="clear" onclick="clearOutput()">Clear</button>
     </div>
+    <div id="test-output"></div>
     
 
     <script>
-        log(typeof Pet);
-        log(typeof Pet.Table);
-
         const docId = '<?= docId ?>';
         const tests = [test00];
 
@@ -30,16 +27,24 @@
         }
 
         function runTests() {
-            log('running tests');
             const options = testSelect.getElementsByTagName('option');
             for (let i = 0; i < options.length; i++) {
-                log(i);
                 if (options[i].selected) {
                     options[i].value;
                     const test = tests[options[i].value];
-                    test();
+                    const tester = new Tester(options[i].innerText);
+                    try {
+                        test(tester);
+                    } catch (e) {
+                        tester.error(String(e));
+                    }
                 }
             }
+        }
+
+        function clearOutput() {
+            const output = document.getElementById('test-output');
+            output.replaceChildren();
         }
 
         function log(str) {
@@ -48,33 +53,31 @@
             document.getElementById('output').appendChild(p);
         }
 
-        function test00() {
-            log('running test00');
-            log(typeof Pet);
-            log(typeof Pet.Table);
+        function test00(tester) {
+            tester.log('running test00');
 
             google.script.run
-                .withSuccessHandler(callback)
-                .withFailureHandler((e) => log(String(e)))
+                .withSuccessHandler(tester.wrapAsync(callback))
+                .withFailureHandler(e => tester.error(e))
                 .makePetList();
 
             async function callback(sheetName) {
-                log(sheetName);
-                log(typeof Pet.Table);
-                log(typeof Pet.Table.open);
+                tester.log(sheetName);
                 const tablePromise = Pet.Table.open({ id: docId, sheetName: sheetName });
-                log('opening');
                 const table = await tablePromise;
-                log('done opening');
                 const r3 = table.getRow(3);
-                log(JSON.stringify(r3));
+                tester.log(JSON.stringify(r3));
+                tester.assertEq(r3, {species:"",name:"",age:0});
+                //throw new Error('big problem here');
 
                 await table.fetchData(1, 6);
                 const r3b = table.getRow(3);
-                log(JSON.stringify(r3b));
+                tester.log(JSON.stringify(r3b));
+                tester.assertEq(r3b, {species:"",name:"",age:0});
+
+                tester.pass();
             }
         }
-
     </script>
   </body>
 </html>

@@ -6,6 +6,10 @@ const LIB_FILES = {
     pet: {
         files: ['tests/pet'],
         namespace: undefined,
+    },
+    tester: {
+        files: ['tests/tester'],
+        namespace: undefined,
     }
 } as const;
 
