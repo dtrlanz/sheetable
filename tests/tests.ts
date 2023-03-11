@@ -79,19 +79,6 @@ function testSidebar() {
     SpreadsheetApp.getUi().showSidebar(html);
 }
 
-function makePetList(): string {
-    const sheet = newSheet(`
-        Species  | Name   | Age
-        dog      | Fluffy | 5
-        cat      | Billy  | 3
-        goldfish | Bob    | 1
-        dog      | Karl   | 6
-    `);
-    return sheet.getSheetName();
-}
-
-
-
 function doGet() {
     const sidebar = HtmlService.createTemplateFromFile('test');
     sidebar.docId = '' // SpreadsheetApp.getActiveSpreadsheet().getId();
