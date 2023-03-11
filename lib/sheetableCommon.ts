@@ -86,7 +86,7 @@ namespace Sheetable {
             // write row to sheet
             const vals: any[] = [];
             fillRowValues(obj, vals, this.headers);
-            this.writeRow(row, vals);
+            return this.writeRow(row, vals);
         }
 
         get(idx: string | Partial<T>, refresh?: boolean): T | undefined {
@@ -106,8 +106,8 @@ namespace Sheetable {
             }
             entry ??= typeof idx === 'object' ? idx : {};
             const row = this.index.get(strIdx) ?? this.dataRowStop;
-            this.setRow(row, entry);
             this.index.set(strIdx, row);
+            return this.setRow(row, entry);
         }
 
         private getIndex(entry: Partial<T>): string | undefined {

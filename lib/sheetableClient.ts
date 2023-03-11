@@ -56,8 +56,18 @@ namespace Sheetable {
                     return this.colData.columns.map(col => col?.[row - this.colData.rowOffset]);
                 };
 
-                writeRow(row: number, vals: any[], checkState: CellCheck): void {
-                    writeSheetRow(this.sheetInfo, row, vals, checkState);
+                writeRow(row: number, vals: any[], checkState: CellCheck): Promise<void> {
+                    let successHandler: (data: SheetColumns) => void = function () {};
+                    let failureHandle: (e: any) => void = successHandler;
+                    const promise = new Promise<void>((res, rej) => {
+                        successHandler = () => res();
+                        failureHandle = (e) => rej(e);
+                    });
+                    google.script.run
+                        .withSuccessHandler(successHandler)
+                        .withFailureHandler(failureHandle)
+                        .writeSheetRow(this.sheetInfo, row, vals);
+                    return promise;
                 }
 
                 fetchData(rowStart: number, rowStop?: number): Promise<void> {
