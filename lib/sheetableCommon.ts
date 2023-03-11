@@ -4,7 +4,11 @@ namespace Sheetable {
 
     export type Orientation = 'normal' | 'transposed';
 
-    export type Sendable = boolean | number | string | null | undefined | { [K: string]: Sendable };
+    export type Sendable = Scalar | { [K: string]: Sendable };
+
+    const SCALARS = ['string', 'number', 'bigint', 'boolean', 'undefined'];
+
+    export type Scalar = string | number | bigint | boolean | undefined ;
 
     interface ObjectParameter { [key: string]: google.script.Parameter }
 
@@ -52,14 +56,10 @@ namespace Sheetable {
         }
 
         protected initIndex() {
-            console.log('initIndex()');
-            console.log([this.dataRowStart, this.dataRowStop]);
             if (!this.indexKey) return;
             this.index.clear();
             for (let row = this.dataRowStart; row < this.dataRowStop; row++) {
                 const entry = this.getRow(row);
-                console.log(row);
-                console.log(JSON.stringify(entry));
                 if (entry?.[this.indexKey])
                     this.index.set(String(entry[this.indexKey]), row);
             }
@@ -129,12 +129,10 @@ namespace Sheetable {
         if (headers.children.length === 0 && 'key' in headers) {
             const val = row[headers.colStart - 1];
             if (typeof headers.key === 'string') {
-                if (headers.key in target) {
-                    applyValue(target, headers.key, val);
-                }
+                applyValue(val, target, headers.key);
             } else {
                 if (Array.isArray(target[headers.key[0]])) {
-                    applyValue(target[headers.key[0]], headers.key[1], val);
+                    applyValue(val, target, headers.key[0], headers.key[1]);
                 }
             }
         } else {
@@ -152,12 +150,30 @@ namespace Sheetable {
         }
     }
 
-    export function applyValue(target: any, propertyKey: string | number, val: any) {
+    export function applyValue(val: any, target: MetaTagged, propertyKey: string, arrIdx?: number) {
         if (val === undefined) return;
-        if (typeof target[propertyKey] === 'number' && typeof val === 'number') {
+        const targetProp = arrIdx ? target[propertyKey][arrIdx] : target[propertyKey];
+        switch (typeof targetProp) {
+            case 'string':
+                val = String(val);
+                break;
+            case 'number':
+                if (typeof val === 'string')
+                    val = parseFloat(val);
+                break;
+            case 'object':
+            case 'undefined':
+                let fromScalar = target[Sheetable.META]?.props?.get(propertyKey)?.ctor?.fromScalar;
+                const ctor = target[Sheetable.META]?.props?.get(propertyKey)?.ctor;
+                if (typeof fromScalar === 'function' && SCALARS.includes(typeof val)) {
+                    val = fromScalar(val);
+                    if (!val) return;
+                }
+        }
+        if (arrIdx) {
+            target[propertyKey][arrIdx] = val;
+        } else {
             target[propertyKey] = val;
-        } else if (typeof target[propertyKey] === 'string') {
-            target[propertyKey] = String(val);
         }
     }
 
@@ -169,6 +185,8 @@ namespace Sheetable {
             } else {
                 val = source[headers.key[0]][headers.key[1]];
             }
+            if (typeof val === 'object' && 'toScalar' in val)
+                val = val.toScalar();
             if (val !== undefined)
                 row[headers.colStart - 1] = val;
         } else {
@@ -214,9 +232,9 @@ namespace Sheetable {
             let item;
             if (typeof key === 'string') {
                 if (obj[key] === undefined) {
-                    const init = obj[Sheetable.META]?.props.get(key)?.init;
-                    if (init) {
-                        obj[key] = init();
+                    const ctor = obj[Sheetable.META]?.props.get(key)?.ctor;
+                    if (ctor) {
+                        obj[key] = new ctor();
                     }
                 }
                 item = obj[key];
@@ -224,9 +242,9 @@ namespace Sheetable {
                 const [k, i] = key;
                 obj[k] ??= [];
                 if (obj[k][i] === undefined) {
-                    const init = obj[Sheetable.META]?.props.get(k)?.init;
-                    if (init) {
-                        obj[k][i] = init();
+                    const ctor = obj[Sheetable.META]?.props.get(k)?.ctor;
+                    if (ctor) {
+                        obj[k][i] = new ctor();
                     }
                 }
                 item = obj[k][i];
@@ -273,12 +291,8 @@ namespace Sheetable {
     }
 
     export function index(target: MetaTagged, propertyKey: string) {
-        console.log('index: ' + propertyKey);
-        console.log(typeof target);
-        console.log(JSON.stringify(target));
         if (target[Sheetable.META]) {
             target[Sheetable.META].index = propertyKey;
-            console.log(JSON.stringify(target[Sheetable.META]));
             return;
         }
         target[Sheetable.META] = {
@@ -286,10 +300,15 @@ namespace Sheetable {
             labelToKey: new Map(),
             index: propertyKey,
         };
-        console.log(JSON.stringify(target[Sheetable.META]));
     }
 
-    function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], init?: () => any }) {
+    export function ctor(value: new () => any) {
+        return function (target: MetaTagged, propertyKey: string) {
+            configureProp(target, propertyKey, { ctor: value });
+        }
+    }
+
+    function configureProp(target: MetaTagged, propertyKey: string, options: { label?: string | string[], ctor?: new () => any }) {
         if (target[Sheetable.META] === undefined) {
             target[Sheetable.META] = {
                 props: new Map(),

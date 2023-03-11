@@ -48,17 +48,19 @@ class Tester {
         }
     }
 
-    assert(assertion: boolean, msg: string = 'assertion failed') {
+    assert(assertion: boolean, msg: string = 'assertion failed'): boolean {
         if (!assertion) this.error(msg);
+        return assertion;
     }
 
-    assertEq(a: any, b: any, msg?: string) {
-        if (deepEq(a, b)) return;
+    assertEq(a: any, b: any, msg?: string): boolean {
+        if (deepEq(a, b)) return true;
         if (msg === undefined) {
             msg = 'Equality assertion failed'
                 + `\nvalue:    ${JSON.stringify(a)}\nexpected: ${JSON.stringify(b)}`;
         }
         this.error(msg);
+        return false;
 
         function deepEq(a: any, b: any): boolean {
             if (typeof a !== typeof b) return false;

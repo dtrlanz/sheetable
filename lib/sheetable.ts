@@ -45,12 +45,13 @@ namespace Sheetable {
         [META]?: {
             props: Map<string, {
                 label?: string | string[],
-                init?: () => any,
+                ctor?: new () => any,
             }>,
             labelToKey: Map<string, string | [string, number]>,
             index?: string,
         };
         [k: string]: any;
+        toScalar?(): Sheetable.Scalar;
     }
 
     export interface HeaderLabels {
@@ -104,7 +105,7 @@ namespace Sheetable {
                 const label = obj[META]?.props.get(k)?.label ?? k;
                 if (label === null) continue;
                 if (Array.isArray(label)) throw Error('array not expected');
-                if (typeof v === 'object') {
+                if (typeof v === 'object' && !('toScalar' in v)) {
                     const subHeaders = {
                         ...createHeaders(v, col, row + 1),
                         row: row,
