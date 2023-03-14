@@ -447,10 +447,13 @@ function getSheet(info: Sheetable.SheetInfo): { spreadsheet: Spreadsheet, sheet:
     return { spreadsheet, sheet, orientation };
 }
 
-function getSheetData(info: Sheetable.SheetInfo = {}, columnLabels: string[], rowStart: number, rowStop?: number): Sheetable.SheetData {
+function getSheetData(info: Sheetable.SheetInfo = {}, rowStart: number, rowStop?: number, columnLabels?: string[]): Sheetable.SheetData {
     const { spreadsheet, sheet, orientation } = getSheet(info);
     const region = Sheetable.Region.fromSheet(sheet, orientation).resize(undefined, rowStop);
     const branches = Sheetable.getHeadersForClient(new Sheetable.TableWalker(region));
+
+    // return all columns by default
+    columnLabels ??= branches.map(br => br.label);
 
     const columnData: Sheetable.Sendable[][] = [];
     for (const label of columnLabels) {

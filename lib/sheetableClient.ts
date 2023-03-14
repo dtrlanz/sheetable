@@ -27,27 +27,47 @@ namespace Sheetable {
                     this.initIndex();
                 }
 
-                static open(sheet: SheetInfo, columnLabels?: string[]): Promise<ClientTable> {
+                static open(sheet: SheetInfo, includeKeys: 'index' | 'all' | string[] = 'index'): Promise<ClientTable> {
                     let successHandler: (data: SheetData) => void = function () {};
                     let failureHandle: (e: any) => void;
                     const promise = new Promise<ClientTable>((res, rej) => {
                         successHandler = function(data: SheetData) {
-                            const table = new ClientTable(data);
-                            res(table);
+                            try {
+                                const table = new ClientTable(data);
+                                res(table);
+                            } catch (e) {
+                                rej(e);
+                            }
                         };
                         failureHandle = function(e) { 
                             rej(e);
                         };
                     })
 
-                    const meta = Constructor.prototype[Sheetable.META];
-                    const indexKey = meta?.index;
-                    const indexLabel = indexKey ? meta?.props.get(indexKey)?.label : undefined;
-                    columnLabels ??= typeof indexLabel === 'string' ? [indexLabel] : [];
+                    const meta = Constructor.prototype[Sheetable.META] as MetaTagged[typeof META];
+                    let columnLabels: string[] | undefined;
+                    function addLabel(arr: string[], label?: string | string[]) {
+                        if (typeof label === 'string') {
+                            arr.push(label)
+                        } else if (label) {
+                            columnLabels = [...arr, ...label];
+                        }
+                    }
+                    if (Array.isArray(includeKeys)) {
+                        columnLabels = [];
+                        for (const k of includeKeys) {
+                            const label = meta?.props.get(k)?.label;
+                            addLabel(columnLabels, label);
+                        }
+                    } else if (includeKeys === 'index') {
+                        const indexKey = meta?.index;
+                        const label = indexKey ? meta?.props.get(indexKey)?.label : undefined;
+                        addLabel(columnLabels = [], label);
+                    }
                     google.script.run
                         .withSuccessHandler(successHandler)
                         .withFailureHandler((e) => console.log('failed to open table: ' + String(e)))
-                        .getSheetData(sheet, columnLabels, 1);
+                        .getSheetData(sheet, 1, undefined, columnLabels);
 
                     return promise;
                 }

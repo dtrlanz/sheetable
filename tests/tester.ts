@@ -88,7 +88,7 @@ class Tester {
         const captureThis = this;
         return async function(...args: Parameters<F>) {
             try {
-                return callback(...args);
+                return await callback(...args);
             } catch(e) {
                 captureThis.error(String(e));
                 throw e;

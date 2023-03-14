@@ -16,7 +16,7 @@ const LIB_FILES = {
         namespace: undefined,
     },
     clientTests: {
-        files: ['tests/client/00', 'tests/client/01'],
+        files: ['tests/client/00', 'tests/client/01', 'tests/client/02'],
         namespace: 'ClientTests',
     },
 } as const;
