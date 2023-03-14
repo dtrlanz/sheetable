@@ -3,18 +3,6 @@ function onOpen() {
     .createMenu('Tests')
     .addItem('Client-side tests...', 'openClientTests')
     .addItem('Server-side tests...', 'openServerTests')
-    .addItem('Test 0a', 'test00a')
-    .addItem('Test 1a', 'test01a')
-    .addItem('Test 1b', 'test01b')
-    // .addItem('Test 2a', 'test02a')
-    // .addItem('Test 2b', 'test02b')
-    // .addItem('Test 2c', 'test02c')
-    // .addItem('Test 2d', 'test02d')
-    // .addItem('Test 2e', 'test02e')
-    // .addItem('Test 3a', 'test03a')
-    // .addItem('Test 3b', 'test03b')
-    // .addItem('Test 3c', 'test03c')
-    .addItem('Test requireLib', 'testRequireLib')
     .addItem('Delete other sheets', 'delSheets')
     .addToUi();
 }
@@ -36,16 +24,24 @@ function delSheets() {
 function newSheet(content: string = '') {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet();
     let row = 1;
-    for (const line of content.split('\n')) {
-        if (line.trim() === '') continue;
+    for (const line of getLines(content)) {
         let col = 1;
-        for (const val of line.trim().split('|')) {
+        for (const val of line.split('|')) {
             sheet.getRange(row, col).setValue(val.trim());
             col++;
         }
         row++;
     }
     return sheet;
+}
+
+function getLines(str: string): string[] {
+    let arr = [];
+    for (const line of str.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed !== '') arr.push(trimmed);
+    }
+    return arr;
 }
 
 function stringifyHeaders<T extends Sheetable.MetaTagged>(table: Sheetable.Table<T>): string {

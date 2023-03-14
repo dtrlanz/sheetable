@@ -201,7 +201,7 @@ namespace Sheetable {
 
     export function getHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
         const { branches, rowStop } = getHeadersHelper(walker);
-        return getHeaderTree(obj, branches, rowStop);
+        return Sheetable.getHeaderTree(obj, branches, rowStop);
     }
 
     export function getHeadersForClient(walker: TableWalker): Branch[] {
