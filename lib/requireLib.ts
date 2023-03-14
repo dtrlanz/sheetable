@@ -19,6 +19,10 @@ const LIB_FILES = {
         files: ['tests/client/00', 'tests/client/01', 'tests/client/02'],
         namespace: 'ClientTests',
     },
+    serverTests: {
+        files: ['tests/server/00'],
+        namespace: undefined,
+    }
 } as const;
 
 function requireLib(libs: (keyof typeof LIB_FILES)[] | keyof typeof LIB_FILES) {

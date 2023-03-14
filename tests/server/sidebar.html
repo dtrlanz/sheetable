@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <?!= include('tests/testStyle'); ?>
+    <?!= requireLib(['tester', 'serverTests']); ?>
+  </head>
+  <body>
+    <select id="tests" multiple size="8"></select>
+    <div class="button-row">
+        <button id="run" class="action" onclick="runTests()">Run</button>
+        <button id="clear" onclick="clearOutput()">Clear</button>
+    </div>
+    <div id="test-output"></div>
+    
+
+    <script>
+        const docId = '<?= docId ?>';
+
+        const testSelect = document.getElementById('tests');
+
+        google.script.run
+            .withSuccessHandler(populateTests)
+            .withFailureHandler(e => console.log(e))
+            .getServerTestList();
+
+        function populateTests(list) {
+            console.log(list);
+            for (const testName of list) {
+                const opt = document.createElement('option');
+                opt.innerText = opt.value = testName;
+                testSelect.appendChild(opt);
+            }
+        }
+
+        function runTests() {
+            const options = testSelect.getElementsByTagName('option');
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].selected) {
+                    const tester = new Tester(options[i].innerText);
+                    google.script.run
+                        .withSuccessHandler(function(testResults) {
+                            for (const entry of testResults) {
+                                if (entry[0] === 'ok')
+                                    tester.log(entry[1]);
+                                else 
+                                    tester.error(entry[1]);
+                            }
+                            tester.pass();
+                        })
+                        .runServerTest(options[i].value);
+                }
+            }
+        }
+
+        function clearOutput() {
+            const output = document.getElementById('test-output');
+            output.replaceChildren();
+        }
+
+    </script>
+  </body>
+</html>

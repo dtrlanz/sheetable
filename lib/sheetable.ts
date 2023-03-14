@@ -42,7 +42,7 @@ namespace Sheetable {
 
 
     export interface MetaTagged {
-        [META]?: {
+        [Sheetable.META]?: {
             props: Map<string, {
                 label?: string | string[],
                 ctor?: new () => any,
@@ -90,7 +90,7 @@ namespace Sheetable {
             const v = obj[k];
             if (Array.isArray(v)) {
                 for (let i = 0; i < v.length; i++) {
-                    const label = obj[META]?.props.get(k)?.label?.[i] ?? `${k}[${i}]`;
+                    const label = obj[Sheetable.META]?.props.get(k)?.label?.[i] ?? `${k}[${i}]`;
                     if (label === null) continue;
                     const subHeaders = {
                         ...createHeaders(v[i], col, row + 1),
@@ -102,7 +102,7 @@ namespace Sheetable {
                     col = subHeaders.colStop;
                 }
             } else {
-                const label = obj[META]?.props.get(k)?.label ?? k;
+                const label = obj[Sheetable.META]?.props.get(k)?.label ?? k;
                 if (label === null) continue;
                 if (Array.isArray(label)) throw Error('array not expected');
                 if (typeof v === 'object' && !('toScalar' in v)) {
