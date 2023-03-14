@@ -7,8 +7,8 @@ namespace Sheetable {
             readonly sheet: Sheet;
             private data: Region;
             
-            private constructor(sheet: Sheet, headers: HeaderNode) {
-                const region = Region.fromSheet(sheet);
+            private constructor(sheet: Sheet, headers: HeaderNode, orientation?: Orientation) {
+                const region = Region.fromSheet(sheet, orientation);
                 super(Constructor, headers, region.rowStop);
                 this.sheet = sheet;
                 this.data = region;
@@ -16,17 +16,19 @@ namespace Sheetable {
             }
 
             static open(sheet: Sheet): ServerTable {
-                const headers = getHeaders(TableWalker.fromSheet(sheet), new Constructor());
+                const specimen = new Constructor();
+                const headers = getHeaders(TableWalker.fromSheet(sheet, specimen[Sheetable.META]?.orientation), specimen);
                 if (!headers) throw new Error('Error reading table headers.');
-                return new ServerTable(sheet, headers);
+                return new ServerTable(sheet, headers, specimen[Sheetable.META]?.orientation);
             }
 
             static create(spreadsheet: Spreadsheet, data: T[] = []): ServerTable {
-                const sheet = spreadsheet.insertSheet();
                 const specimen = data?.[0] ?? new Constructor();
+                const sheet = spreadsheet.insertSheet();
+                const region = Region.fromSheet(sheet, specimen[Sheetable.META]?.orientation);
                 const headers = createHeaders(specimen, 1, 1);
-                writeHeaders(headers, sheet);
-                return new ServerTable(sheet, headers);
+                writeHeaders(headers, region);
+                return new ServerTable(sheet, headers, specimen[Sheetable.META]?.orientation);
             }
 
             readRow(row: number, checkState: CellCheck): any[] | undefined {
@@ -49,6 +51,7 @@ namespace Sheetable {
             }>,
             labelToKey: Map<string, string | [string, number]>,
             index?: string,
+            orientation: Orientation,
         };
         [k: string]: any;
         toScalar?(): Sheetable.Scalar;
@@ -72,11 +75,11 @@ namespace Sheetable {
         readonly label: string;
     }
 
-    export function writeHeaders(headers: HeaderNode, sheet: Sheet) {
+    export function writeHeaders(headers: HeaderNode, region: Region) {
         if ('label' in headers) {
-            sheet.getRange(headers.row, headers.colStart).setValue(headers.label);
+            region.write(headers.row, headers.colStart, headers.label);
         }
-        for (const c of headers.children) writeHeaders(c, sheet);
+        for (const c of headers.children) writeHeaders(c, region);
     }
 
     export function createHeaders(
@@ -105,7 +108,7 @@ namespace Sheetable {
                 const label = obj[Sheetable.META]?.props.get(k)?.label ?? k;
                 if (label === null) continue;
                 if (Array.isArray(label)) throw Error('array not expected');
-                if (typeof v === 'object' && !('toScalar' in v)) {
+                if (typeof v === 'object' && !('toScalar' in v) && !(v instanceof Date)) {
                     const subHeaders = {
                         ...createHeaders(v, col, row + 1),
                         row: row,
@@ -292,6 +295,14 @@ namespace Sheetable {
             }
         }
 
+        write(row: number, col: number, value: any) {
+            if (this.orientation === 'normal') {
+                return this.sheet.getRange(row, col).setValue(value);
+            } else {
+                return this.sheet.getRange(col, row).setValue(value);
+            }
+        }
+
         readRow(row: number): any[] | undefined {
             if (row < this.rowStart || row >= this.rowStop)
                 return undefined;
@@ -358,8 +369,8 @@ namespace Sheetable {
             this.col = col ?? 1;
         }
 
-        static fromSheet(sheet: Sheet): TableWalker {
-            return new TableWalker(Region.fromSheet(sheet));
+        static fromSheet(sheet: Sheet, orientation: Orientation = 'normal'): TableWalker {
+            return new TableWalker(Region.fromSheet(sheet, orientation));
         }
 
         move(row: number, col: number): TableWalker | undefined {
@@ -443,7 +454,7 @@ function getSheet(info: Sheetable.SheetInfo): { spreadsheet: Spreadsheet, sheet:
     } else {
         sheet = spreadsheet.getSheets()[0];
     }
-    const orientation = info.orientation === 'transposed' ? 'transposed' : 'normal';
+    const orientation = info.orientation ?? 'normal';
     return { spreadsheet, sheet, orientation };
 }
 

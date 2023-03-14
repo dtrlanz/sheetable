@@ -11,6 +11,10 @@ const LIB_FILES = {
         files: ['tests/numbers'],
         namespace: undefined,
     },
+    quiz: {
+        files: ['tests/quiz'],
+        namespace: undefined,
+    },
     tester: {
         files: ['tests/tester'],
         namespace: undefined,

@@ -64,6 +64,7 @@ namespace Sheetable {
                         const label = indexKey ? meta?.props.get(indexKey)?.label : undefined;
                         addLabel(columnLabels = [], label);
                     }
+                    sheet.orientation ??= meta?.orientation ?? 'normal';
                     google.script.run
                         .withSuccessHandler(successHandler)
                         .withFailureHandler((e) => console.log('failed to open table: ' + String(e)))

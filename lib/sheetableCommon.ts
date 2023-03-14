@@ -299,7 +299,22 @@ namespace Sheetable {
             props: new Map(),
             labelToKey: new Map(),
             index: propertyKey,
+            orientation: 'normal',
         };
+    }
+
+    export function orientation(orientation: Orientation) {
+        return function<T extends MetaTagged>(Constructor: { new (): T }) {
+            if (Constructor.prototype[Sheetable.META]) {
+                Constructor.prototype[Sheetable.META].orientation = orientation;
+                return;
+            }
+            Constructor.prototype[Sheetable.META] = {
+                props: new Map(),
+                labelToKey: new Map(),
+                orientation: orientation,
+            };
+        }
     }
 
     export function ctor(value: new () => any) {
@@ -313,6 +328,7 @@ namespace Sheetable {
             target[Sheetable.META] = {
                 props: new Map(),
                 labelToKey: new Map(),
+                orientation: 'normal',
             };
         }
         let prop = target[Sheetable.META].props.get(propertyKey);
