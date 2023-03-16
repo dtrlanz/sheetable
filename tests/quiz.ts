@@ -13,8 +13,6 @@ class Quiz {
     @Sheetable.index @Sheetable.label('')
     date: Date;
 
-    John?: number;
-    Beth?: number;
-    Salman?: number;
+    [name: Capitalize<string>]: number | undefined;
 
 }

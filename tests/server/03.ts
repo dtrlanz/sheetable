@@ -29,7 +29,7 @@ namespace ServerTests {
         tester.assertEq(table.getRow(3), {
             date: '25.1.2023',
             John: 10,
-            Beth: null,
+            Beth: '',
             Salman: 7,
         });
     }
