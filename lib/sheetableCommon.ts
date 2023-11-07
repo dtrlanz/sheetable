@@ -162,6 +162,10 @@ namespace Sheetable {
                     val = parseFloat(val);
                 break;
             case 'object':
+                if (targetProp instanceof Date) {
+                    val = new Date(val);
+                    break;
+                }
             case 'undefined':
                 let fromScalar = target[Sheetable.META]?.props?.get(propertyKey)?.ctor?.fromScalar;
                 const ctor = target[Sheetable.META]?.props?.get(propertyKey)?.ctor;

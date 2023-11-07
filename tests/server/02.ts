@@ -20,7 +20,7 @@ namespace ServerTests {
     export function getByRowNumber1(tester: ServerTester) {
         const sheet = newSheet(`
             Title                 | Author 1   |              | Date
-                                  | First Name | Last Name    | Year
+                                  | First Name | Last Name    | 
             To Kill A Mockingbird | Harper     | Lee          | 1960
             Don Quixote           | Miguel     | de Cervantes | 1605
             Jane Eyre             | Charlotte  | Brontë       | 1847
