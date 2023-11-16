@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+  </head>
+  <body>
+    <div id="message"></div>
+
+    <script type="module">
+        import { msg } from './client.ts';
+        document.getElementById('message').innerText = msg;
+    </script>
+  </body>
+</html>
