@@ -52,6 +52,7 @@ namespace Sheetable {
             labelToKey: Map<string, string | [string, number]>,
             index?: string,
             orientation: Orientation,
+            defaultCtor?: new () => any,
         };
         [k: string]: any;
         toScalar?(): Sheetable.Scalar;
@@ -204,7 +205,7 @@ namespace Sheetable {
 
     export function getHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
         const { branches, rowStop } = getHeadersHelper(walker);
-        return Sheetable.getHeaderTree(obj, branches, rowStop);
+        return Sheetable.getHeaderTree(obj, branches, rowStop, 'stop');
     }
 
     export function getHeadersForClient(walker: TableWalker): Branch[] {
@@ -334,8 +335,12 @@ namespace Sheetable {
                 this.sheet.getRange(row, this.colStart, 1, this.colStop - this.colStart)
                     .setValues([data]);
             } else {
+                const arr = [];
+                for (let i = 0; i < this.colStop - this.colStart; i++) {
+                    arr[i] = [data[i]];
+                }
                 this.sheet.getRange(this.colStart, row, this.colStop - this.colStart, 1)
-                    .setValues(data.map(v => [v]));
+                    .setValues(arr);
             }
             return r ?? this;
         }
@@ -509,9 +514,15 @@ function getSheetColumns(info: Sheetable.SheetInfo = {}, columns: number[], rowS
 }
 
 function writeSheetRow(info: Sheetable.SheetInfo, row: number, vals: Sheetable.Sendable[], checkState?: Sheetable.CellCheck) {
+    const arr = vals.map(v =>
+        typeof v !== 'object' ? v
+            : v === null ? null
+            : Sheetable.SENDABLE_DATE_KEY in v ? new Date(v[Sheetable.SENDABLE_DATE_KEY] as number)
+            : '[internal error at writeSheetRow]'
+    );
     const { sheet, orientation } = getSheet(info);
     const region = Sheetable.Region.fromSheet(sheet, orientation);
-    region.writeRow(row, vals, 'encroach');
+    region.writeRow(row, arr, 'encroach');
 
 }
 

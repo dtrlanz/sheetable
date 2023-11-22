@@ -10,6 +10,8 @@ namespace Sheetable {
 
     export type Scalar = string | number | bigint | boolean | undefined ;
 
+    export const SENDABLE_DATE_KEY = '__DATE';
+
     interface ObjectParameter { [key: string]: google.script.Parameter }
 
     export interface SheetInfo extends ObjectParameter {
@@ -167,8 +169,10 @@ namespace Sheetable {
                     break;
                 }
             case 'undefined':
-                let fromScalar = target[Sheetable.META]?.props?.get(propertyKey)?.ctor?.fromScalar;
-                const ctor = target[Sheetable.META]?.props?.get(propertyKey)?.ctor;
+                const propCtor = target[Sheetable.META]?.props?.get(propertyKey)?.ctor;
+                const defaultCtor = target[Sheetable.META]?.defaultCtor;
+                const ctor = propCtor ?? defaultCtor;
+                let fromScalar = (ctor as any)?.fromScalar;
                 if (typeof fromScalar === 'function' && SCALARS.includes(typeof val)) {
                     val = fromScalar(val);
                     if (!val) return;
@@ -220,9 +224,17 @@ namespace Sheetable {
         }
     }
 
-    export function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number): HeaderNode | undefined {
+    export function getHeaderTree(obj: MetaTagged, branches: Branch[], rowStop: number, onGap: 'ignore' | 'stop'): HeaderNode | undefined {
         // ui.alert(`branch labels: ${branches.map(b=>b.label).join(', ')}`);
         if (branches.length === 0 || branches[0].row >= rowStop) return undefined;
+        if (onGap === 'stop') {
+            for (let i = 1; i < branches.length; i++) {
+                if (branches[i - 1].stop < branches[i].start) {
+                    branches.splice(i);
+                    break;
+                }
+            }
+        }
         const root: HeaderNode = {
             colStart: branches[0].start,
             colStop: branches[branches.length - 1].stop,
@@ -322,8 +334,23 @@ namespace Sheetable {
     }
 
     export function ctor(value: new () => any) {
-        return function (target: MetaTagged, propertyKey: string) {
-            configureProp(target, propertyKey, { ctor: value });
+        return function (target: MetaTagged, propertyKey?: string) {
+            if (propertyKey) {
+                // use as property decorator
+                configureProp(target, propertyKey, { ctor: value });
+            } else {
+                // use as class decorator
+                if (target.prototype[Sheetable.META]) {
+                    target.prototype[Sheetable.META].defaultCtor = value;
+                    return;
+                }
+                target.prototype[Sheetable.META] = {
+                    props: new Map(),
+                    labelToKey: new Map(),
+                    orientation: 'normal',
+                    defaultCtor: value,
+                };
+            }
         }
     }
 

@@ -13,11 +13,15 @@ namespace Sheetable {
                         if (col && col.length > maxColLen) maxColLen = col.length;
                     }
                     const dataRowStart = Sheetable.getMaxRow({ row: 1, children: data.headers }) + 1;
-                    const headers = Sheetable.getHeaderTree(new Constructor(), data.headers, dataRowStart);
+                    const headers = Sheetable.getHeaderTree(new Constructor(), data.headers, dataRowStart, 'stop');
                     if (headers === undefined) throw new Error('failed to parse headers');
                     super(Constructor, headers, maxColLen + 1, dataRowStart);
 
-                    this.sheetInfo = { url: data.url, sheetName: data.sheetName };
+                    this.sheetInfo = { 
+                        url: data.url, 
+                        sheetName: data.sheetName,
+                        orientation: data.orientation,
+                    };
                     this.colData = data;
                     this.includeCols = [];
                     for (const c of this.headers.children) {
@@ -82,8 +86,18 @@ namespace Sheetable {
                     let failureHandle: (e: any) => void = successHandler;
                     const promise = new Promise<void>((res, rej) => {
                         successHandler = () => res();
-                        failureHandle = (e) => rej(e);
+                        failureHandle = (e) => {
+                            console.log(e);
+                            rej(e);
+                        };
                     });
+                    for (let i = 0; i < vals.length; i++) {
+                        if (vals[i] instanceof Date) {
+                            vals[i] = {
+                                [Sheetable.SENDABLE_DATE_KEY]: (vals[i] as Date).getTime()
+                            };
+                        }
+                    }
                     google.script.run
                         .withSuccessHandler(successHandler)
                         .withFailureHandler(failureHandle)

@@ -147,7 +147,7 @@ export function findBranches(walker: TableWalker): BranchResult | null {
 
 export function getHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
     const { branches, rowStop } = getHeadersHelper(walker);
-    return Sheetable.getHeaderTree(obj, branches, rowStop);
+    return Sheetable.getHeaderTree(obj, branches, rowStop, 'stop');
 }
 
 export function getHeadersForClient(walker: TableWalker): Branch[] {

@@ -74,11 +74,16 @@ export function getSheetColumns(info: Sheetable.SheetInfo = {}, columns: number[
     }
 }
 
-export function writeSheetRow(info: Sheetable.SheetInfo, row: number, vals: Sheetable.Sendable[], checkState?: Sheetable.CellCheck) {
+function writeSheetRow(info: Sheetable.SheetInfo, row: number, vals: Sheetable.Sendable[], checkState?: Sheetable.CellCheck) {
+    const arr = vals.map(v =>
+        typeof v !== 'object' ? v
+            : v === null ? null
+            : Sheetable.SENDABLE_DATE_KEY in v ? new Date(v[Sheetable.SENDABLE_DATE_KEY] as number)
+            : '[internal error at writeSheetRow]'
+    );
     const { sheet, orientation } = getSheet(info);
     const region = Sheetable.Region.fromSheet(sheet, orientation);
-    region.writeRow(row, vals, 'encroach');
-
+    region.writeRow(row, arr, 'encroach');
 }
 
 function scalarToSendable(val: any): Sheetable.Sendable {

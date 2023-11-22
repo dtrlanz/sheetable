@@ -82,8 +82,12 @@ export class Region {
             this.sheet.getRange(row, this.colStart, 1, this.colStop - this.colStart)
                 .setValues([data]);
         } else {
+            const arr = [];
+            for (let i = 0; i < this.colStop - this.colStart; i++) {
+                arr[i] = [data[i]];
+            }
             this.sheet.getRange(this.colStart, row, this.colStop - this.colStart, 1)
-                .setValues(data.map(v => [v]));
+                .setValues(arr);
         }
         return r ?? this;
     }
