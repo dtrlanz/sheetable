@@ -1,14 +1,29 @@
 export type Orientation = 'normal' | 'transposed';
 
+export interface SheetLike {
+    getLastColumn(): number;
+    getLastRow(): number;
+    getRange(row: number, colunn: number, numRows?: number, numColumns?: number): RangeLike;
+    insertColumns(columnIndex: number, numColumns?: number): void;
+    insertRows(rowIndex: number, numRows?: number): void;
+}
+
+export interface RangeLike {
+    getValue(): any;
+    getValues(): any[][];
+    setValue(value: number | string | boolean | Date): void;
+    setValues(values: (number | string | boolean | Date)[][]): void;
+}
+
 export class Region {
-    readonly sheet: Sheet;
+    readonly sheet: SheetLike;
     readonly orientation: Orientation;
     readonly colStart: number;
     readonly colStop: number;
     readonly rowStart: number;
     readonly rowStop: number;
 
-    constructor(sheet: Sheet, rowStart: number, rowStop: number, colStart: number, colStop: number, orientation: Orientation) {
+    constructor(sheet: SheetLike, rowStart: number, rowStop: number, colStart: number, colStop: number, orientation: Orientation) {
         this.sheet = sheet;
         this.orientation = orientation;
         this.colStart = colStart;
@@ -17,7 +32,7 @@ export class Region {
         this.rowStop = rowStop;
     }
 
-    static fromSheet(sheet: Sheet, orientation: Orientation = 'normal'): Region {
+    static fromSheet(sheet: SheetLike, orientation: Orientation = 'normal'): Region {
         let rowStop = sheet.getLastRow() + 1;
         let colStop = sheet.getLastColumn() + 1;
         if (orientation === 'transposed') [colStop, rowStop] = [rowStop, colStop];
