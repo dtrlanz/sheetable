@@ -6,8 +6,8 @@ export { Region, TableWalker } from "../src/sheet-navigation.js";
 export class TestSheet implements SheetLike {
     _rows: (number | string | boolean | Date)[][];
 
-    constructor(rows: (number | string | boolean | Date)[][]) {
-        this._rows = rows;
+    constructor(data: (number | string | boolean | Date)[][]) {
+        this._rows = data;
     }
 
     getLastColumn(): number {
@@ -72,6 +72,56 @@ export class TestRange implements RangeLike {
         for (let i = 0; i < values.length; i++) {
             this.sheet._rows[this.row - 1 + i].splice(this.colunn - 1, this.numColumns, ...values[i]);
         }
+    }
+}
+
+const rowSeparator = '\n';
+const columnSeparator = '|';
+
+export function sheet(strings: TemplateStringsArray, ...expressions: any[]) {
+    const rows: (number | string | boolean | Date)[][] = [[]];
+    for (let i = 0; i < expressions.length; i++) {
+        const str = i === 0 ? strings[i].trimStart() : strings[i];
+        processString(str, i > 0, true, rows);
+        let val = expressions[i];
+        if (!(typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean' || 'toUTCString' in val)) {
+            // convert to string if type unsupported
+            val = `${val}`;
+        }
+        rows[rows.length - 1].push(val);
+    }
+    if (expressions.length > 0) {
+        processString(strings[strings.length - 1].trimEnd(), true, false, rows);
+    } else {
+        processString(strings[strings.length - 1].trim(), false, false, rows);
+    }
+    
+    return new TestSheet(rows);
+
+    function processString(str: string, ignoreFirst: boolean, ignoreLast: boolean, data: (number | string | boolean | Date)[][]) {
+        const vals = str.split(rowSeparator)
+            .map(row => row.split(columnSeparator)
+                .map(val => {
+                    val = val.trim();
+                    const num = Number.parseFloat(val);
+                    if (!Number.isNaN(num)) {
+                        return num;
+                    }
+                    return val;
+                })
+            );
+        if (ignoreFirst) vals[0].shift();
+        if (ignoreLast) vals[vals.length - 1].pop();
+        // guaranteed to run at least one (vals.length >= 1)
+        for (const row of vals) {
+            const addTo = data[data.length - 1];
+            for (const cell of row) {
+                addTo.push(cell);
+            }
+            data.push([]);
+        }
+        // remove empty row that was just added after the last cycle
+        data.pop();
     }
 }
 
@@ -203,3 +253,30 @@ test('set values', t => {
         r45_78b.setValues([[0, 1, 2], [3, 4], [6, 7, 8]]);
     });
 });
+
+test('tagged templates', t => {
+    const numbers = sheet`
+        0 | 1 | 2
+        3 | 4 | 5
+        6 | 7 | 8
+    `.getRange(1, 1, 3, 3).getValues();
+    t.deepEqual(numbers, [[0, 1, 2], [3, 4, 5], [6, 7, 8]]);
+
+    const strings = sheet`
+        a   | b   | c
+        a a | b b | c c
+        a   |     |
+    `.getRange(1, 1, 3, 3).getValues();
+    t.deepEqual(strings, [['a', 'b', 'c'], ['a a', 'b b', 'c c'], ['a', '', '']]);
+
+    const empty = sheet``.getRange(1, 1, 3, 3).getValues();
+    t.deepEqual(empty, [['']]);
+
+    const misc = sheet`
+        a | 4 | -3.14
+        ${new Date('2023-11-24')} | ${true} | @
+        ${true} | ${false} | _
+    `.getRange(1, 1, 3, 3).getValues();
+    t.deepEqual(misc, [['a', 4, -3.14], [new Date(Date.UTC(2023, 10, 24)), true, '@'], [true, false, '_']]);
+});
+
