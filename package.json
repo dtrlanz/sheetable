@@ -10,5 +10,11 @@
   },
   "scripts": {
     "test": "ava"
+  },
+  "ava": {
+    "files": [
+      "**/test/*",
+      "**/test/util/*test*"
+    ]
   }
 }
