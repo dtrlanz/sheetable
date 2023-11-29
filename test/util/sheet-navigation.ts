@@ -1,5 +1,4 @@
 import { SheetLike, RangeLike } from "../../src/sheet-navigation.js";
-export { Region, TableWalker } from "../../src/sheet-navigation.js";
 
 export class TestSheet implements SheetLike {
     _rows: (number | string | boolean | Date)[][];
