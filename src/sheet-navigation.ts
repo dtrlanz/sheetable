@@ -44,7 +44,7 @@ export class Region {
         rowStop ??= this.rowStop;
         colStart ??= this.colStart;
         colStop ??= this.colStop;
-        return new Region(this.sheet, 1, rowStop, 1, colStop, this.orientation);
+        return new Region(this.sheet, rowStart, rowStop, colStart, colStop, this.orientation);
     }
 
     read(row: number, col: number): any {
@@ -132,8 +132,8 @@ export class TableWalker {
 
     constructor(region: Region, row?: number, col?: number) {
         this.region = region;
-        this.row = row ?? 1;
-        this.col = col ?? 1;
+        this.row = row ?? region.rowStart;
+        this.col = col ?? region.colStart;
     }
 
     static fromSheet(sheet: Sheet, orientation: Orientation = 'normal'): TableWalker {
