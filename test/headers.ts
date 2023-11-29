@@ -1,6 +1,9 @@
 import test from 'ava';
+import { sheet } from "./util/sheet-navigation.js";
+
 import { Branch, getHeadersHelper } from '../src/headers.js';
-import { Region, TableWalker, TestRange, sheet } from "./util/sheet-navigation.js";
+import { Region, TableWalker } from "../src/sheet-navigation.js";
+
 
 
 test('find header branches', t => {
