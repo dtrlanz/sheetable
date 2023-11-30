@@ -1,3 +1,7 @@
+import { SheetLike, Orientation, Region, TableWalker } from "./sheet-navigation.js";
+import { Branch, getHeadersHelper } from "./headers.js";
+import { Sendable, toSendable } from "./values.js";
+
 export function getSheet(info: Sheetable.SheetInfo): { spreadsheet: Spreadsheet, sheet: Sheet, orientation: Sheetable.Orientation } {
     let spreadsheet: Spreadsheet;
     let sheet: Sheet;
@@ -97,3 +101,144 @@ function scalarToSendable(val: any): Sheetable.Sendable {
         return (val as Date).getTime();
     }
 }
+
+type SheetRequest = {
+    orientation: Orientation,
+    limit?: {
+        rowStart?: number,
+        rowStop?: number,
+        colStart?: number,
+        colStop?: number,
+    },
+    getHeaders?: boolean,
+    getData?: boolean | {
+        colNumbers?: number[],      // `colNumbers` takes precedence
+        colHeaders?: string[],      // `colHeaders` ignored if `colNumbers` is present
+        rowStart?: number,
+        rowStop?: number,
+    },
+};
+
+type SheetResponse = {
+    headers?: Branch[],
+    data?: {
+        rows: Sendable[][],
+        colNumbers: number[],
+        rowOffset: number,
+    },
+};
+
+export class SheetServer {
+    sheet: SheetLike;
+
+    constructor(sheet: SheetLike) {
+        this.sheet = sheet;
+    }
+
+    request(req: SheetRequest): SheetResponse {
+        const region = Region
+            .fromSheet(this.sheet)
+            .crop(req.limit?.rowStart, req.limit?.rowStop, 
+                req.limit?.colStart, req.limit?.colStop);
+        
+        // Need to find headers if:
+        // - requester asked for headers OR
+        // - requester asked for data based on headers (`colHeaders: [...]`)
+        const headersNeeded = req.getHeaders || typeof req.getData === 'object' 
+            && req.getData.colHeaders && !req.getData.colNumbers;
+
+        let headers: SheetResponse['headers'];
+        let dataRegion = region;
+        if (headersNeeded) {
+            const { branches, rowStop } = getHeadersHelper(new TableWalker(region));
+            headers = branches;
+            // data starts starts after last header row (at minimum)
+            // data width limited to header width
+            dataRegion = dataRegion.crop(rowStop, undefined, 
+                branches[0].start, branches[branches.length - 1].stop);
+        }
+
+        // Retrieve requested columns
+        let data: SheetResponse['data'];
+        if (req.getData) {
+            if (typeof req.getData === 'object') {
+                dataRegion = dataRegion.crop(req.getData.rowStart, req.getData.rowStop);
+            }
+
+            if (req.getData === true || (!req.getData.colNumbers && !req.getData.colHeaders)) {
+                // include all columns
+                data = {
+                    rows: dataRegion.readAll(),
+                    colNumbers: intRange(dataRegion.colStart, dataRegion.colStop),
+                    rowOffset: dataRegion.rowStart,
+                };
+            } else {
+                // include specific columns
+                let colNumbers = req.getData.colNumbers?.filter(v => 
+                    // ensure column numbers are within data region
+                    v >= dataRegion.colStart && v < dataRegion.colStop);
+
+                if (!colNumbers) {
+                    colNumbers = [];
+                    if (!headers || !req.getData.colHeaders) throw new Error('unreachable');
+                    // Note: The `colHeaders` array specifies top-level headers. If any header spans
+                    // multiple columns, include all columns.
+                    for (const h of headers) {
+                        if (req.getData.colHeaders.includes(h.label)) {
+                            colNumbers.splice(colNumbers.length, 0, ...intRange(h.start, h.stop));
+                        }
+                    }
+                }
+                const colRange = isRange(colNumbers);
+                if (colRange) {
+                    // optimize for contiguous columns (more common)
+                    dataRegion = dataRegion.crop(undefined, undefined, colRange.start, colRange.stop);
+                    data = {
+                        rows: dataRegion.readAll(),
+                        colNumbers: intRange(dataRegion.colStart, dataRegion.colStop),
+                        rowOffset: dataRegion.rowStart,
+                    };
+                } else {
+                    // pick out non-contiguous columns (less common)
+                    const colOffset = dataRegion.colStart;
+                    data = {
+                        rows: dataRegion.readAll().map(
+                            row => colNumbers!.map(
+                                n => row[n - colOffset]
+                        )),
+                        colNumbers: colNumbers,
+                        rowOffset: dataRegion.rowStart,
+                    };
+                }
+            }
+        }
+
+        return { headers, data };
+    }
+}
+
+function intRange(start: number, stop: number): number[] {
+    const r = [];
+    for (let i = start; i < stop; i++) {
+        r.push(i);
+    }
+    return r;
+}
+
+function isRange(arr: number[]): { start: number, stop: number } | false {
+    for (let i = 1; i < arr.length; i++) {
+        if (arr[i] !== arr[0] + i) return false;
+    }
+    return { 
+        start: arr[0],
+        stop: arr[0] + arr.length,
+    };
+}
+
+// class SheetClient {
+//     orientation: Orientation;
+
+//     protected async request(req: SheetRequest): Promise<SheetResponse> {
+
+//     }
+// }

@@ -3,7 +3,7 @@ export type Orientation = 'normal' | 'transposed';
 export interface SheetLike {
     getLastColumn(): number;
     getLastRow(): number;
-    getRange(row: number, colunn: number, numRows?: number, numColumns?: number): RangeLike;
+    getRange(row: number, column: number, numRows?: number, numColumns?: number): RangeLike;
     insertColumns(columnIndex: number, numColumns?: number): void;
     insertRows(rowIndex: number, numRows?: number): void;
 }
@@ -39,12 +39,25 @@ export class Region {
         return new Region(sheet, 1, rowStop, 1, colStop, orientation);
     }
 
+    // may be depracated in favor of `crop()`
     resize(rowStart?: number, rowStop?: number, colStart?: number, colStop?: number): Region {
         rowStart ??= this.rowStart;
         rowStop ??= this.rowStop;
         colStart ??= this.colStart;
         colStop ??= this.colStop;
         return new Region(this.sheet, rowStart, rowStop, colStart, colStop, this.orientation);
+    }
+
+    // like resize but only ever makes region smaller (guaranteed to stay within original bounds)
+    // this is probably what's called for usually, may replace `resize()`
+    crop(rowStart?: number, rowStop?: number, colStart?: number, colStop?: number): Region {
+        return new Region(this.sheet, 
+            Math.max(rowStart ?? 0, this.rowStart), 
+            Math.min(rowStop ?? this.rowStop, this.rowStop), 
+            Math.max(colStart ?? 0, this.colStart),
+            Math.min(colStop ?? this.colStop, this.colStop), 
+            this.orientation
+        );
     }
 
     read(row: number, col: number): any {
