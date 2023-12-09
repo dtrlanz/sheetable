@@ -104,6 +104,15 @@ test('simple meta props', t => {
     t.is(lReader.get(ClassB, 'bar'), 'brilliant');
     t.deepEqual(lReader.entries(ClassB), [['bar', 'brilliant'], ['foo', 'very good']])
 
+    // list() returns truthy entries
+    class ClassD extends ClassC {
+        @laudable('')
+        bam = 11;
+    }
+    // `bam` included among entries b/c value exists
+    t.deepEqual(lReader.entries(ClassD), [['bar', 'brilliant'], ['foo', 'not bad'], ['bam', '']]);
+    // `list()` returns truthy values
+    t.deepEqual(lReader.list(ClassD), ['bar', 'foo']);
 });
 
 test('conditional meta props', t => {

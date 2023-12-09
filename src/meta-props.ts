@@ -72,6 +72,13 @@ class MetaPropReader<T> {
         return ctor[Symbol.metadata][this.metaPropKey];
     }
 
+    /**
+     * Returns value of this meta property for a given class or class members
+     * 
+     * @param obj - instance or constructor of the class to which this meta property was applied
+     * @param [key] - property key; if omitted, returns value applied by class decorator
+     * @returns value or undefined
+     */
     get(obj: object | Constructor, key?: string | symbol): T | undefined {
         const map = this.getData(obj);
         const record = map?.get(key);
@@ -82,6 +89,12 @@ class MetaPropReader<T> {
         return record.default;
     }
 
+    /**
+     * Returns key-value pairs of class members for which this meta property has a value
+     * 
+     * @param obj - instance or constructor of the class to which this meta property was applied
+     * @returns array of key-value pairs
+     */
     entries(obj: object | Constructor): [(string | symbol), T][] {
         const arr = [];
         for (const [key, record] of this.getData(obj) ?? []) {
@@ -92,9 +105,21 @@ class MetaPropReader<T> {
                     val = value
                 }
             }
-            if (val) arr.push([key, val] as [(string | symbol), T]);
+            if (val !== undefined) arr.push([key, val] as [(string | symbol), T]);
         }
         return arr;
+    }
+
+    /**
+     * Returns keys of class members for which this meta property has a truthy value
+     * 
+     * @param obj - instance or constructor of the class to which this meta property was applied
+     * @returns array of keys
+     */
+    list(obj: object | Constructor): (string | symbol)[] {
+        return this.entries(obj)
+            .filter(([_, v]) => v)
+            .map(([k]) => k);
     }
 }
 
