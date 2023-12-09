@@ -8,7 +8,7 @@ export class MetaProperty<T> {
         this.key = Symbol(desciption);
     }
 
-    getDecorator(value: any) {
+    getDecorator(value: T) {
         const metaPropkey = this.key;
         function decorator(_target: any, context: DecoratorContext): void {
             updateMetadata(context, value);
@@ -98,7 +98,7 @@ class MetaPropReader<T> {
     }
 }
 
-type Constructor = new (...args: any[]) => any;
+export type Constructor = new (...args: any[]) => any;
 
 type MetaPropCondition = (context: { [k: string]: any }) => boolean;
 
