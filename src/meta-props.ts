@@ -69,7 +69,7 @@ class MetaPropReader<T> {
 
     private getData(obj: object | Constructor): Map<String | symbol | undefined, MetaPropRecord<T>> | undefined {
         const ctor = typeof obj === 'function' ? obj : Object.getPrototypeOf(obj).constructor;
-        return ctor[Symbol.metadata][this.metaPropKey];
+        return ctor[Symbol.metadata]?.[this.metaPropKey];
     }
 
     /**

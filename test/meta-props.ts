@@ -1,6 +1,15 @@
 import test from 'ava';
 import { MetaProperty } from "../src/meta-props.js";
 
+test('reading something not decorated', t => {
+    class ClassA {}
+    const obj = new ClassA();
+    let reader = new MetaProperty('prop').getReader();
+
+    t.is(reader.get(ClassA), undefined);
+    t.is(reader.get(obj), undefined);
+})
+
 test('simple meta props', t => {
     const palatableProp = new MetaProperty('palatable');
     const palatable = palatableProp.getDecorator('🍕');
