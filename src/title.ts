@@ -1,4 +1,5 @@
 import { MetaProperty, Constructor } from "./meta-props.js";
+import { getPropConstructor } from "./type.js";
 
 const titleProp = new MetaProperty<string | string[]>('title');
 const spreadProp = new MetaProperty<boolean>('spread');
@@ -17,19 +18,35 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
     if (title.length === 0) return [];
 
     // to do: cache this stuff
+    const toBeSpread = new Set(spreadProp.getReader(context).list(obj));
     const map: Map<string, { key: string | symbol, idx?: number }> = new Map();
-    for (const [key, v] of titleProp.getReader(context).entries(obj)) {
-        if (typeof v === 'string') {
-            map.set(v, { key });
+    for (const [key, value] of titleProp.getReader(context).entries(obj)) {
+        if (typeof value === 'string') {
+            // only one title provided
+            // - if spread: assume this is an object, use object's properties in place of current
+            //   property
+            // - otherwise: store property key
+            if (!toBeSpread.has(key)) {
+                map.set(value, { key });
+            }
         } else {
-            for (let idx = 0; idx < v.length; idx++) {
-                map.set(v[idx], { key, idx })
+            // several titles provided
+            // - if spread: assume this is an array, use title list as titles of array items
+            // - otherwise: use first title, ignore rest (emit warning)
+            if (toBeSpread.has(key)) {
+                for (let idx = 0; idx < value.length; idx++) {
+                    map.set(value[idx], { key, idx })
+                }
+            } else {
+                console.warn(`Rest titles [${value.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                map.set(value[0], { key });
             }
         }
     }
 
-    const found = map.get(title[0]);
-    if (!found) return undefined;
+    let found = map.get(title[0]);
+    // use property key as fallback
+    found ??= { key: title[0] };
     const { key, idx } = found;
 
     let tail: (string | symbol | number)[] = [];
@@ -45,7 +62,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
             }
             nextObj = val;
         } else {
-            throw new Error('not yet implemented: retrieve property type from constructor');
+            nextObj = getPropConstructor(obj, key);
         }
         const nextPath = getObjectPath(title.slice(1), nextObj, context);
         if (!nextPath) {
@@ -54,7 +71,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
         tail = nextPath;
     }
 
-    if (idx) {
+    if (idx !== undefined) {
         return [key, idx, ...tail];
     } else {
         return [key, ...tail];

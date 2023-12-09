@@ -12,12 +12,12 @@ test('simple title conversion', t => {
 
     t.deepEqual(getObjectPath(['Foo'], ClassA), ['foo']);
     t.deepEqual(getObjectPath(['Bar'], ClassA), ['bar']);
-    t.deepEqual(getObjectPath(['Baz'], ClassA), undefined);
+    t.deepEqual(getObjectPath(['Baz'], ClassA), ['Baz'], 'use title as fallback');
 
     const objA = new ClassA();
     t.deepEqual(getObjectPath(['Foo'], objA), ['foo']);
     t.deepEqual(getObjectPath(['Bar'], objA), ['bar']);
-    t.deepEqual(getObjectPath(['Baz'], objA), undefined);
+    t.deepEqual(getObjectPath(['Baz'], objA), ['Baz'], 'use title as fallback');
 
     const mySymbol = Symbol('mySymbol');
     class ClassB {
@@ -34,7 +34,44 @@ test('simple title conversion', t => {
     const objB = new ClassB();
     t.deepEqual(getObjectPath(['Apples', 'Foo'], objB), ['a', 'foo']);
     t.deepEqual(getObjectPath(['Apples', 'Bar'], objB), ['a', 'bar']);
-    t.deepEqual(getObjectPath(['Apples', 'Baz'], objB), undefined);
+    t.deepEqual(getObjectPath(['Apples', 'Baz'], objB), ['a', 'Baz'], 'use title as fallback');
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
-})
+});
+
+test('array indexing', t => {
+    class ClassA {
+        @spread @title('A', 'B', 'C', 'D')
+        foo = [0, 1, 2, 3];
+
+        @title('Bar')
+        accessor bar = false;
+    }
+
+    t.deepEqual(getObjectPath(['A'], ClassA), ['foo', 0]);
+    t.deepEqual(getObjectPath(['B'], ClassA), ['foo', 1]);
+    t.deepEqual(getObjectPath(['C'], ClassA), ['foo', 2]);
+    t.deepEqual(getObjectPath(['D'], ClassA), ['foo', 3]);
+    t.deepEqual(getObjectPath(['Bar'], ClassA), ['bar']);
+
+    const objA = new ClassA();
+    const mySymbol = Symbol('mySymbol');
+    class ClassB {
+        @title('Apples')
+        a = objA;
+
+        @title('Oranges')
+        b = 42;
+
+        @title('Bicycles')
+        [mySymbol] = true;
+    }
+
+    const objB = new ClassB();
+    t.deepEqual(getObjectPath(['Apples', 'A'], ClassA), ['a', 'foo', 0]);
+    t.deepEqual(getObjectPath(['Apples', 'B'], ClassA), ['a', 'foo', 1]);
+    t.deepEqual(getObjectPath(['Apples', 'C'], ClassA), ['a', 'foo', 2]);
+    t.deepEqual(getObjectPath(['Apples', 'D'], ClassA), ['a', 'foo', 3]);
+    t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
+    t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
+});
