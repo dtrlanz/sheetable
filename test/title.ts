@@ -39,7 +39,7 @@ test('simple title conversion', t => {
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
 });
 
-test('array indexing', t => {
+test('array spreading', t => {
     class ClassA {
         @spread @title('A', 'B', 'C', 'D')
         foo = [0, 1, 2, 3];
@@ -68,10 +68,10 @@ test('array indexing', t => {
     }
 
     const objB = new ClassB();
-    t.deepEqual(getObjectPath(['Apples', 'A'], ClassA), ['a', 'foo', 0]);
-    t.deepEqual(getObjectPath(['Apples', 'B'], ClassA), ['a', 'foo', 1]);
-    t.deepEqual(getObjectPath(['Apples', 'C'], ClassA), ['a', 'foo', 2]);
-    t.deepEqual(getObjectPath(['Apples', 'D'], ClassA), ['a', 'foo', 3]);
+    t.deepEqual(getObjectPath(['Apples', 'A'], objB), ['a', 'foo', 0]);
+    t.deepEqual(getObjectPath(['Apples', 'B'], objB), ['a', 'foo', 1]);
+    t.deepEqual(getObjectPath(['Apples', 'C'], objB), ['a', 'foo', 2]);
+    t.deepEqual(getObjectPath(['Apples', 'D'], objB), ['a', 'foo', 3]);
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
 });
