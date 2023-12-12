@@ -75,3 +75,63 @@ test('array spreading', t => {
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
 });
+
+test('object spreading', t => {
+    class ClassA {
+        @title('Foo')
+        foo = 3.14;
+
+        @title('Bar')
+        accessor bar = false;
+    }
+
+    const objA = new ClassA();
+    class ClassB {
+        @spread 
+        @title('Apples')    // title 'Apples' ignored because of @spread
+        a = objA;           // titles of ClassA's properties used instead
+
+        @title('Oranges')
+        b = 42;
+    }
+
+    const objB = new ClassB();
+    t.deepEqual(getObjectPath(['Foo'], objB), ['a', 'foo']);
+    t.deepEqual(getObjectPath(['Bar'], objB), ['a', 'bar']);
+    t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
+
+    // No corresponding annotations exist, so these titles are simply passed through
+    t.deepEqual(getObjectPath(['Apples'], objB), ['Apples']);
+    t.deepEqual(getObjectPath(['Apples', 'Foo'], objB), ['Apples', 'Foo']);
+    t.deepEqual(getObjectPath(['Apples', 'Bar'], objB), ['Apples', 'Bar']);
+
+    class ClassC {
+        @spread
+        @title('Onions', 'Tomatoes')
+        a = [objA, objA];
+
+        @spread
+        @title('Bicycles')  // title 'Bicycles' ignored because of @spread
+        b = objB;
+    }
+
+    const objC = new ClassC();
+    t.deepEqual(getObjectPath(['Onions'], objC), ['a', 0]);
+    t.deepEqual(getObjectPath(['Tomatoes'], objC), ['a', 1]);
+    t.deepEqual(getObjectPath(['Bicycles'], objC), ['Bicycles']);
+    t.deepEqual(getObjectPath(['Cucumbers'], objC), ['Cucumbers']);
+
+    t.deepEqual(getObjectPath(['Onions', 'Foo'], objC), ['a', 0, 'foo']);
+    t.deepEqual(getObjectPath(['Onions', 'Bar'], objC), ['a', 0, 'bar']);
+    t.deepEqual(getObjectPath(['Onions', 'Baz'], objC), ['a', 0, 'Baz']);
+    t.deepEqual(getObjectPath(['Tomatoes', 'Foo'], objC), ['a', 1, 'foo']);
+    t.deepEqual(getObjectPath(['Tomatoes', 'Bar'], objC), ['a', 1, 'bar']);
+    t.deepEqual(getObjectPath(['Tomatoes', 'Baz'], objC), ['a', 1, 'Baz']);
+
+    t.deepEqual(getObjectPath(['Apples'], objC), ['Apples'], 'should not match (b/c @spread)');
+    t.deepEqual(getObjectPath(['Apples', 'Foo'], objC), ['Apples', 'Foo'], 'should not match (b/c @spread)');
+    t.deepEqual(getObjectPath(['Foo'], objC), ['b', 'a', 'foo'], 'should match (spread deeply)');
+    t.deepEqual(getObjectPath(['Bar'], objC), ['b', 'a', 'bar'], 'should match (spread deeply)');
+    t.deepEqual(getObjectPath(['Oranges'], objC), ['b', 'b']);
+    t.deepEqual(getObjectPath(['Oranges', 'Foo'], objC), ['b', 'b', 'Foo']);
+});

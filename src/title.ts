@@ -14,17 +14,18 @@ export function title(title: string, ...rest: string[]) {
     }
 }
 
-export function getObjectPath(title: string[], obj: object | Constructor, context?: { [k: string]: any }): (string | symbol | number)[] | undefined {
+export function getObjectPath(title: string[], obj: object | Constructor, context?: { [k: string]: any }, includeRest: boolean = true): (string | symbol | number)[] | undefined {
     if (title.length === 0) return [];
 
     // to do: cache this stuff
     const toBeSpread = new Set(spreadProp.getReader(context).list(obj));
     const map: Map<string, { key: string | symbol, idx?: number }> = new Map();
-    for (const [key, value] of titleProp.getReader(context).entries(obj)) {
+    const titlePropReader = titleProp.getReader(context);
+    for (const [key, value] of titlePropReader.entries(obj)) {
         if (typeof value === 'string') {
             // only one title provided
             // - if spread: assume this is an object, use object's properties in place of current
-            //   property
+            //   property (no action needed right now)
             // - otherwise: store property key
             if (!toBeSpread.has(key)) {
                 map.set(value, { key });
@@ -45,30 +46,62 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
     }
 
     let found = map.get(title[0]);
-    // use property key as fallback
-    found ??= { key: title[0] };
+    if (!found) {
+        // Title mapping not defined. Try using title directly as property key.
+        const objOrPrototype = typeof obj === 'object' ? obj : Object.getPrototypeOf(obj);
+        if (title[0] in objOrPrototype) {
+            found ??= { key: title[0] };
+        }
+        if (!found) {
+            // Property not found on this object.
+            // Next try members of properties with @spread decorator.
+            for (const key of toBeSpread) {
+                // exclude properties with array spreading (only interested in object spreading here)
+                if (typeof titlePropReader.get(obj, key) === 'object') continue;
+
+                const nextObj = objOrPrototype[key];
+                if (nextObj && typeof nextObj === 'object') {
+                    const path = getObjectPath(title, nextObj, context, false);
+                    if (path) {
+                        return [key, ...path];
+                    }
+                }
+            }
+            // No match found.
+            if (!found) {
+                // If unmatched titles should be retained, default to using title as key.
+                return includeRest ? title : undefined;
+            }
+        }
+    }
     const { key, idx } = found;
 
-    let tail: (string | symbol | number)[] = [];
+    // Matching property was found for title[0]. Now process rest of title array.
+    // Use title as fallback if further matching does not succeed.
+    let tail: (string | symbol | number)[] = title.slice(1);
     if (title.length > 1) {
-        let nextObj: object | Constructor;
+        let nextObj: object | Constructor | undefined;
         if (typeof obj === 'object') {
             let val = (obj as any)[key];
             if (idx !== undefined) {
-                val = val[idx];
+                if (val && typeof val === 'object') {
+                    val = val[idx];
+                } else {
+                    val = undefined;
+                }
             }
-            if (!(val && typeof val === 'object')) {
-                return undefined;
+            if (val && typeof val === 'object') {
+                nextObj = val;
             }
-            nextObj = val;
         } else {
             nextObj = getPropConstructor(obj, key);
         }
-        const nextPath = getObjectPath(title.slice(1), nextObj, context);
-        if (!nextPath) {
-            return undefined;
+        if (nextObj) {
+            const nextPath = getObjectPath(title.slice(1), nextObj, context, false);
+            if (nextPath) {
+                tail = nextPath;
+            }
         }
-        tail = nextPath;
     }
 
     if (idx !== undefined) {
