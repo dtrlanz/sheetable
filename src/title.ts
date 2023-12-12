@@ -3,8 +3,10 @@ import { getPropConstructor } from "./type.js";
 
 const titleProp = new MetaProperty<string | string[]>('title');
 const spreadProp = new MetaProperty<boolean>('spread');
+const restProp = new MetaProperty<boolean>('rest');
 
 export const spread = spreadProp.getDecorator(true);
+export const rest = restProp.getDecorator(true);
 
 export function title(title: string, ...rest: string[]) {
     if (rest.length === 0) {
@@ -19,6 +21,12 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
 
     // to do: cache this stuff
     const toBeSpread = new Set(spreadProp.getReader(context).list(obj));
+    const restList = restProp.getReader(context).list(obj);
+    if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
+    const restKey = restList.at(0);
+    if (restKey && !toBeSpread.has(restKey)) {
+        console.warn('@rest decorator is ignored unless accompanied by @spread');
+    }
     const map: Map<string, { key: string | symbol, idx?: number }> = new Map();
     const titlePropReader = titleProp.getReader(context);
     for (const [key, value] of titlePropReader.entries(obj)) {
@@ -61,7 +69,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
 
                 const nextObj = objOrPrototype[key];
                 if (nextObj && typeof nextObj === 'object') {
-                    const path = getObjectPath(title, nextObj, context, false);
+                    const path = getObjectPath(title, nextObj, context, includeRest && key === restKey);
                     if (path) {
                         return [key, ...path];
                     }

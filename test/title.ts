@@ -1,5 +1,5 @@
 import test from 'ava';
-import { title, spread, getObjectPath } from "../src/title.js";
+import { title, spread, rest, getObjectPath } from "../src/title.js";
 
 test('simple title conversion', t => {
     class ClassA {
@@ -134,4 +134,70 @@ test('object spreading', t => {
     t.deepEqual(getObjectPath(['Bar'], objC), ['b', 'a', 'bar'], 'should match (spread deeply)');
     t.deepEqual(getObjectPath(['Oranges'], objC), ['b', 'b']);
     t.deepEqual(getObjectPath(['Oranges', 'Foo'], objC), ['b', 'b', 'Foo']);
+});
+
+test('rest collection', t => {
+    class ClassA {
+        @title('Foo')
+        foo = 3.14;
+
+        @title('Bar')
+        accessor bar = false;
+    }
+
+    const objA = new ClassA();
+    t.deepEqual(getObjectPath(['Baz'], objA, undefined, true), ['Baz']);
+    t.deepEqual(getObjectPath(['Baz'], objA, undefined, false), undefined);
+
+    class ClassB {
+        @spread @rest
+        a = objA;
+
+        @title('Apples')
+        b = 0;
+    }
+
+    const objB = new ClassB();
+    t.deepEqual(getObjectPath(['Foo'], objB), ['a', 'foo']);
+    t.deepEqual(getObjectPath(['Bar'], objB), ['a', 'bar']);
+    t.deepEqual(getObjectPath(['Apples'], objB), ['b']);
+    t.deepEqual(getObjectPath(['Baz'], objB), ['a', 'Baz'], 'unmatched titles should be assigned to a');
+
+    class ClassC {
+        x = 25;
+
+        @spread @rest
+        y = objB;
+    }
+
+    const objC = new ClassC();
+    t.deepEqual(getObjectPath(['x'], objC), ['x']);
+    t.deepEqual(getObjectPath(['y'], objC), ['y']);
+    t.deepEqual(getObjectPath(['Apples'], objC), ['y', 'b']);
+    t.deepEqual(getObjectPath(['Foo'], objC), ['y', 'a', 'foo']);
+    t.deepEqual(getObjectPath(['Bar'], objC), ['y', 'a', 'bar']);
+    t.deepEqual(getObjectPath(['Baz'], objC), ['y', 'a', 'Baz'], 'unmatched titles should be assigned to y.a');
+
+    class ClassD {
+        x = 25;
+
+        @spread
+        y = objB;
+    }
+
+    const objD = new ClassD();
+    t.deepEqual(getObjectPath(['Apples'], objD), ['y', 'b']);
+    t.deepEqual(getObjectPath(['Foo'], objD), ['y', 'a', 'foo']);
+    t.deepEqual(getObjectPath(['Bar'], objD), ['y', 'a', 'bar']);
+    t.deepEqual(getObjectPath(['Baz'], objD), ['Baz'], 'unmatched titles should be retained at top level');
+
+    class ClassE {
+        @spread @rest
+        x = objA;
+
+        @spread @rest
+        y = objB;
+    }
+    const objE = new ClassE();
+    t.throws(() => getObjectPath(['Foo'], objE));
 });
