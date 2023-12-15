@@ -123,7 +123,7 @@ class MetaPropReader<T> {
     }
 }
 
-export type Constructor = new (...args: any[]) => any;
+export type Constructor<T = object> = new (...args: any[]) => T;
 
 type MetaPropCondition = (context: { [k: string]: any }) => boolean;
 

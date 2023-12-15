@@ -37,6 +37,12 @@ test('simple title conversion', t => {
     t.deepEqual(getObjectPath(['Apples', 'Baz'], objB), ['a', 'Baz'], 'use title as fallback');
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
+
+    t.deepEqual(getObjectPath(['Apples', 'Foo'], ClassB), ['a', 'foo']);
+    t.deepEqual(getObjectPath(['Apples', 'Bar'], ClassB), ['a', 'bar']);
+    t.deepEqual(getObjectPath(['Apples', 'Baz'], ClassB), ['a', 'Baz'], 'use title as fallback');
+    t.deepEqual(getObjectPath(['Oranges'], ClassB), ['b']);
+    t.deepEqual(getObjectPath(['Bicycles'], ClassB), [mySymbol]);
 });
 
 test('array spreading', t => {

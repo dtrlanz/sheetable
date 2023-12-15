@@ -19,7 +19,7 @@ export function title(title: string, ...rest: string[]) {
 export function getObjectPath(title: string[], obj: object | Constructor, context?: { [k: string]: any }, includeRest: boolean = true): (string | symbol | number)[] | undefined {
     if (title.length === 0) return [];
 
-    // to do: cache this stuff
+    // TODO: cache this stuff
     const toBeSpread = new Set(spreadProp.getReader(context).list(obj));
     const restList = restProp.getReader(context).list(obj);
     if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
