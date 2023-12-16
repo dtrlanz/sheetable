@@ -8,7 +8,7 @@ export class TestSheet implements SheetLike {
     }
 
     getLastColumn(): number {
-        return this._rows[0].length;
+        return this._rows.reduce((max, row) => Math.max(max, row.length), 0);
     }
 
     getLastRow(): number {

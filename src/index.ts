@@ -1,4 +1,4 @@
-globalThis.onEdit = onEdit;
-function onEdit() {
-    console.log('document was edited')
+
+export class Index<T> {
+    
 }

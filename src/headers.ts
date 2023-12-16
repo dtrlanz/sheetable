@@ -1,4 +1,76 @@
+import { Constructor } from "./meta-props.js";
 import { Region, TableWalker } from "./sheet-navigation.js";
+import { getObjectPath } from "./title.js";
+
+export class Header<T> {
+    readonly ctor: Constructor<T>;
+    readonly context: { readonly [k: string]: any };
+    private firstRow: number;
+    private rowCount: number;
+    private firstCol: number;
+    private columns: ({ titles: string[], keys: (string | symbol | number)[] } | undefined)[];
+
+    private constructor(
+        ctor: Constructor<T>, 
+        context: { readonly [k: string]: any },
+        columns: ({ titles: string[], keys: (string | symbol | number)[] } | undefined)[],
+        firstRow: number,
+        firstCol: number
+    ) {
+        this.ctor = ctor;
+        this.context = context;
+        this.firstRow = firstRow;
+        this.rowCount = columns.reduce((max, col) => Math.max(max, col?.titles.length ?? 0), 1);
+        this.firstCol = firstCol;
+        this.columns = columns;
+    }
+
+    static create<T>(
+        ctor: Constructor<T>, 
+        samples: Iterable<T>, 
+        context: { readonly [k: string]: any } = {}, 
+        firstRow: number = 1, 
+        firstColumn: number = 1
+    ): Header<T> {
+        throw new Error('Header.create() not yet implemented');
+    }
+
+    static open<T>(
+        ctor: Constructor<T>, 
+        header: Branch[],
+        context: { readonly [k: string]: any } = {},
+    ): Header<T> {
+        const firstRow = header[0].row;
+        const firstCol = header[0].start;
+
+        const columns = branchesToColumns([], header).map(titles => {
+            if (!titles) return undefined;
+            const keys = getObjectPath(titles, ctor, context);
+            if (!keys) return undefined;
+            return { titles, keys };
+        });
+
+        return new Header(ctor, context, columns, firstRow, firstCol);
+
+        function branchesToColumns(prefix: string[], branches: Branch[]) {
+            let arr: (string[] | undefined)[] = [];
+            let col = branches[0].start;
+            for (const b of branches) {
+                for (; col < b.start; col++) {
+                    arr.push(undefined);    // preserve column gaps
+                }
+                if (b.children.length) {
+                    arr = [...arr, ...branchesToColumns([...prefix, b.label], b.children)];
+                    col = b.children.at(-1)!.stop;
+                } else {
+                    arr.push([...prefix, b.label]);
+                    col++;
+                }
+            }
+            return arr;
+        }
+    }
+}
 
 export interface HeaderLabels {
     [K: string]: string | string[];
@@ -125,7 +197,7 @@ export function findBranches(walker: TableWalker): BranchResult | null {
                 }
             }
         }
-        const actualStop = children[children.length - 1]?.stop ?? startPoints[i].col + 1;
+        const actualStop = children.at(-1)?.stop ?? startPoints[i].col + 1;
         arr.push({
             label: startPoints[i].value,
             row: startPoints[i].row,
@@ -185,7 +257,9 @@ export function getHeadersHelper(walker: TableWalker): { branches: Branch[], row
             next = next?.crop(undefined, dataStart.row);
         walker = next ?? walker;
     }
+    console.log(branches);
     const br = findBranches(walker);
+    console.log(br);
     if (br) {
         const { branches: otherBranches, minRowStop, maxRowStop } = br;
         branches = [...branches, ...otherBranches];

@@ -235,10 +235,12 @@ function isRange(arr: number[]): { start: number, stop: number } | false {
     };
 }
 
-// class SheetClient {
-//     orientation: Orientation;
+export class SheetClient {
+    readonly orientation: Orientation;
+    private readonly request: (req: SheetRequest) => Promise<SheetResponse>;
 
-//     protected async request(req: SheetRequest): Promise<SheetResponse> {
-
-//     }
-// }
+    constructor(orientation: Orientation, request: (req: SheetRequest) => Promise<SheetResponse>) {
+        this.orientation = orientation;
+        this.request = request;
+    }
+}
