@@ -236,7 +236,10 @@ function isRange(arr: number[]): { start: number, stop: number } | false {
 }
 
 export class SheetClient {
+    readonly url?: string;
+    readonly sheetName?: string;
     readonly orientation: Orientation;
+    
     private readonly request: (req: SheetRequest) => Promise<SheetResponse>;
 
     constructor(orientation: Orientation, request: (req: SheetRequest) => Promise<SheetResponse>) {
