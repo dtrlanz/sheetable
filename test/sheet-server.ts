@@ -1,12 +1,12 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
 
-import { SheetServer } from "../src/sheet-server.js";
+import { SheetClient, SheetServer } from "../src/sheet-server.js";
 import { Branch } from '../src/headers.js';
 
-const server = new SheetServer(sheet`
- A |    |  B |  C |     |     |     |  D |   E |  F |
-A1 | A2 |    | C1 |  C2 |     |     |    |  E1 |    |
+const sample = sheet`
+A  |    | B  | C  |     |     |     | D  | E   | F  |
+A1 | A2 |    | C1 | C2  |     |     |    | E1  |    |
    |    |    |    | C21 | C22 | C23 |    | E11 |    |
  0 |  1 |  2 |  3 |   4 |   5 |   6 |  7 |   8 |  9 |
 10 | 11 | 12 | 13 |  14 |  15 |  16 | 17 |  18 | 19 |
@@ -15,7 +15,8 @@ A1 | A2 |    | C1 |  C2 |     |     |    |  E1 |    |
 40 | 41 | 42 | 43 |  44 |  45 |  46 | 47 |  48 | 49 |
 50 | 51 | 52 | 53 |  54 |  55 |  56 | 57 |  58 | 59 |
 60 | 61 | 62 | 63 |  64 |  65 |  66 | 67 |  68 | 69 |
-`);
+`;
+const server = new SheetServer(sample);
 
 const expectedHeaders = [
     br('A', 1, 1, 3,
@@ -56,7 +57,7 @@ test('get all data (incl. header rows)', t => {
     t.falsy(headers0);
     t.is(data0?.rowOffset, 1);
     t.deepEqual(data0?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    t.deepEqual(data0?.rows, server.sheet.getRange(1, 1, 10, 11).getValues());
+    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 11).getValues());
 
     const { data: data1, headers: headers1 } = server.request({
         orientation: 'normal',
@@ -68,7 +69,7 @@ test('get all data (incl. header rows)', t => {
     t.falsy(headers1);
     t.is(data1?.rowOffset, 1);
     t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    t.deepEqual(data1?.rows, server.sheet.getRange(1, 1, 10, 11).getValues());
+    t.deepEqual(data1?.rows, sample.getRange(1, 1, 10, 11).getValues());
 
     const { data: data2, headers: headers2 } = server.request({
         orientation: 'normal',
@@ -81,7 +82,7 @@ test('get all data (incl. header rows)', t => {
     t.falsy(headers2);
     t.is(data2?.rowOffset, 1);
     t.deepEqual(data2?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    t.deepEqual(data2?.rows, server.sheet.getRange(1, 1, 10, 11).getValues());
+    t.deepEqual(data2?.rows, sample.getRange(1, 1, 10, 11).getValues());
 });
 
 test('get all data (excl. header rows)', t => {
@@ -94,7 +95,7 @@ test('get all data (excl. header rows)', t => {
     t.deepEqual(headers0, expectedHeaders);
     t.is(data0?.rowOffset, 4);
     t.deepEqual(data0?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    t.deepEqual(data0?.rows, server.sheet.getRange(4, 1, 7, 10).getValues());
+    t.deepEqual(data0?.rows, sample.getRange(4, 1, 7, 10).getValues());
 
     const { data: data1, headers: headers1 } = server.request({
         orientation: 'normal',
@@ -107,7 +108,7 @@ test('get all data (excl. header rows)', t => {
     t.deepEqual(headers1, expectedHeaders);
     t.is(data1?.rowOffset, 4);
     t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    t.deepEqual(data1?.rows, server.sheet.getRange(4, 1, 7, 10).getValues());
+    t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 10).getValues());
 
     const { data: data2, headers: headers2 } = server.request({
         orientation: 'normal',
@@ -119,7 +120,7 @@ test('get all data (excl. header rows)', t => {
     t.deepEqual(headers2, expectedHeaders);
     t.is(data2?.rowOffset, 4);
     t.deepEqual(data2?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    t.deepEqual(data2?.rows, server.sheet.getRange(4, 1, 7, 10).getValues());
+    t.deepEqual(data2?.rows, sample.getRange(4, 1, 7, 10).getValues());
 });
 
 test('select contiguous columns', t => {
@@ -133,7 +134,7 @@ test('select contiguous columns', t => {
     t.falsy(headers0);
     t.is(data0?.rowOffset, 1);
     t.deepEqual(data0?.colNumbers, [1, 2, 3]);
-    t.deepEqual(data0?.rows, server.sheet.getRange(1, 1, 10, 3).getValues());
+    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 3).getValues());
 
     const { data: data1, headers: headers1 } = server.request({
         orientation: 'normal',
@@ -145,7 +146,7 @@ test('select contiguous columns', t => {
     t.falsy(headers1);
     t.is(data1?.rowOffset, 1);
     t.deepEqual(data1?.colNumbers, [2, 3, 4, 5, 6, 7, 8, 9]);
-    t.deepEqual(data1?.rows, server.sheet.getRange(1, 2, 10, 8).getValues());
+    t.deepEqual(data1?.rows, sample.getRange(1, 2, 10, 8).getValues());
 
     const { data: data2, headers: headers2 } = server.request({
         orientation: 'normal',
@@ -157,7 +158,7 @@ test('select contiguous columns', t => {
     t.falsy(headers2);
     t.is(data2?.rowOffset, 1);
     t.deepEqual(data2?.colNumbers, [7, 8, 9, 10, 11]);
-    t.deepEqual(data2?.rows, server.sheet.getRange(1, 7, 10, 5).getValues());
+    t.deepEqual(data2?.rows, sample.getRange(1, 7, 10, 5).getValues());
 });
 
 test('reorder contiguous columns', t => {
@@ -170,7 +171,7 @@ test('reorder contiguous columns', t => {
     t.falsy(headers0);
     t.is(data0?.rowOffset, 1);
     t.deepEqual(data0?.colNumbers, colNumbers);
-    t.deepEqual(data0?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [4, 5, 6, 2, 3, 7, 8, 9];
@@ -182,7 +183,7 @@ test('reorder contiguous columns', t => {
     t.falsy(headers1);
     t.is(data1?.rowOffset, 1);
     t.deepEqual(data1?.colNumbers, colNumbers);
-    t.deepEqual(data1?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data1?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [11, 7, 8, 9, 10];
@@ -194,7 +195,7 @@ test('reorder contiguous columns', t => {
     t.falsy(headers2);
     t.is(data2?.rowOffset, 1);
     t.deepEqual(data2?.colNumbers, colNumbers);
-    t.deepEqual(data2?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data2?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
 });
@@ -209,7 +210,7 @@ test('repeat contiguous columns', t => {
     t.falsy(headers0);
     t.is(data0?.rowOffset, 1);
     t.deepEqual(data0?.colNumbers, colNumbers);
-    t.deepEqual(data0?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [7, 8, 9, 10, 11, 7, 8, 9, 10, 11];
@@ -221,7 +222,7 @@ test('repeat contiguous columns', t => {
     t.falsy(headers1);
     t.is(data1?.rowOffset, 1);
     t.deepEqual(data1?.colNumbers, colNumbers);
-    t.deepEqual(data1?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data1?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 });
 
@@ -235,7 +236,7 @@ test('select non-contiguous columns', t => {
     t.falsy(headers0);
     t.is(data0?.rowOffset, 1);
     t.deepEqual(data0?.colNumbers, colNumbers);
-    t.deepEqual(data0?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [1, 4, 5, 6, 9, 10];
@@ -247,7 +248,7 @@ test('select non-contiguous columns', t => {
     t.falsy(headers1);
     t.is(data1?.rowOffset, 1);
     t.deepEqual(data1?.colNumbers, colNumbers);
-    t.deepEqual(data1?.rows, server.sheet.getRange(1, 1, 10, 11).getValues()
+    t.deepEqual(data1?.rows, sample.getRange(1, 1, 10, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 });
 
@@ -263,7 +264,7 @@ test('select contiguous headers', t => {
     t.deepEqual(headers0, expectedHeaders);
     t.is(data0?.rowOffset, 4);
     t.deepEqual(data0?.colNumbers, colNumbers);
-    t.deepEqual(data0?.rows, server.sheet.getRange(4, 1, 7, 11).getValues()
+    t.deepEqual(data0?.rows, sample.getRange(4, 1, 7, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [4, 5, 6, 7];
@@ -277,7 +278,7 @@ test('select contiguous headers', t => {
     t.deepEqual(headers1, expectedHeaders);
     t.is(data1?.rowOffset, 4);
     t.deepEqual(data1?.colNumbers, colNumbers);
-    t.deepEqual(data1?.rows, server.sheet.getRange(4, 1, 7, 11).getValues()
+    t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));});
 
 test('select non-contiguous headers', t => {
@@ -292,7 +293,7 @@ test('select non-contiguous headers', t => {
     t.deepEqual(headers0, expectedHeaders);
     t.is(data0?.rowOffset, 4);
     t.deepEqual(data0?.colNumbers, colNumbers);
-    t.deepEqual(data0?.rows, server.sheet.getRange(4, 1, 7, 11).getValues()
+    t.deepEqual(data0?.rows, sample.getRange(4, 1, 7, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [8, 10];
@@ -306,6 +307,48 @@ test('select non-contiguous headers', t => {
     t.deepEqual(headers1, expectedHeaders);
     t.is(data1?.rowOffset, 4);
     t.deepEqual(data1?.colNumbers, colNumbers);
-    t.deepEqual(data1?.rows, server.sheet.getRange(4, 1, 7, 11).getValues()
+    t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 11).getValues()
         .map(row => colNumbers.map(n => row[n - 1])));
+});
+
+test('client get', async t => {
+    const client = SheetClient.fromSheet(sample);
+    const { headers: headers0, data: data0 } = await client.get('none');
+    t.deepEqual(headers0, expectedHeaders);
+    t.is(data0, undefined);
+
+    const { headers: headers1, data: data1 } = await client.get('all');
+    t.deepEqual(headers1, expectedHeaders);
+    t.is(data1?.rowOffset, 4);
+    t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 10).getValues());
+    
+    const { headers: headers2, data: data2 } = await client.get(['A', 'B', 'C', 'D', 'E', 'F']);
+    t.deepEqual(headers2, expectedHeaders);
+    t.deepEqual(data2?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    t.deepEqual(data2?.rows, sample.getRange(4, 1, 7, 10).getValues());
+
+    const { headers: headers3, data: data3 } = await client.get(['A', 'C']);
+    t.deepEqual(headers3, expectedHeaders);
+    t.deepEqual(data3?.colNumbers, [1, 2, 4, 5, 6, 7]);
+    t.deepEqual(data3?.rows, sample.getRange(4, 1, 7, 11).getValues()
+        .map(row => [1, 2, 4, 5, 6, 7].map(n => row[n - 1])));
+});
+
+test('client get rows', async t => {
+    const client = SheetClient.fromSheet(sample);
+    const data0 = await client.getRows();
+    t.is(data0?.rowOffset, 1);
+    t.deepEqual(data0?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 11).getValues());
+    
+    const data1 = await client.getRows(4, 11);
+    t.is(data1?.rowOffset, 4);
+    t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 11).getValues());
+
+    const data = await client.getRows(7, 9);
+    t.is(data?.rowOffset, 7);
+    t.deepEqual(data?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    t.deepEqual(data?.rows, sample.getRange(7, 1, 2, 11).getValues());
 });

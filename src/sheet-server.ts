@@ -239,11 +239,59 @@ export class SheetClient {
     readonly url?: string;
     readonly sheetName?: string;
     readonly orientation: Orientation;
-    
+    range: {
+        rowStart?: number,
+        rowStop?: number,
+        colStart?: number,
+        colStop?: number,
+    } = {};
     private readonly request: (req: SheetRequest) => Promise<SheetResponse>;
 
-    constructor(orientation: Orientation, request: (req: SheetRequest) => Promise<SheetResponse>) {
+    constructor(
+        url: string | undefined, 
+        sheetName: string | undefined, 
+        orientation: Orientation, 
+        request: (req: SheetRequest) => Promise<SheetResponse>
+    ) {
+        this.url = url;
+        this.sheetName = sheetName;
         this.orientation = orientation;
         this.request = request;
+    }
+
+    static async fromUrl(url?: string, sheetName?: string, orientation: Orientation = 'normal'): Promise<SheetClient> {
+        throw new Error('SheetClient.fromUrl() not yet implemented');
+    }
+
+    static fromSheet(sheet: SheetLike, sheetName?: string, orientation: Orientation = 'normal'): SheetClient {
+        const server = new SheetServer(sheet);
+        return new SheetClient(
+            undefined,
+            sheetName,
+            orientation,
+            req => Promise.resolve(server.request(req))
+        );
+    }
+
+    async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SheetResponse['data'] }> {
+        return this.request({
+            orientation: this.orientation,
+            limit: this.range,
+            getHeaders: true,   // thus result.headers !== undefined (i.e., type cast below is ok)
+            getData: 
+                columns == 'all' ? true : 
+                columns == 'none' ? false :
+                { colHeaders: columns },
+        }) as Promise<{ headers: Branch[], data: SheetResponse['data'] }>; 
+    }
+
+    async getRows(rowStart?: number, rowStop?: number): Promise<SheetResponse['data']> {
+        const { data } = await this.request({
+            orientation: this.orientation,
+            limit: this.range,
+            getHeaders: false,
+            getData: { rowStart, rowStop },
+        });
+        return data;
     }
 }
