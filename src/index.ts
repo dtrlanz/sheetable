@@ -13,6 +13,7 @@ export class Index<T extends object> {
     header: Header<T>;
     indexKeys: (string | symbol)[];
     indexTitles: string[];
+    map = new TupleMap<number>();
 
     constructor(
         ctor: Constructor<T>, 
@@ -27,7 +28,15 @@ export class Index<T extends object> {
         this.indexTitles = getIndexTitles(ctor, context);
     }
 
-    setRows(rows: Sendable[][], colNumbers: number[], rowOffset: number) {
+    /**
+     * Sets the index ids for multiple rows of data
+     * @param rows - 2-dimensional array of row data
+     * @param colNumbers - 1-dimensional numeric array identifying column numbers 
+     *  corresponding to 2nd dimension of `rows` array
+     * @param firstIdxId - numeric index id to be stored for the first row in the `rows` array
+     *  (default: 0); index numbers of subsequent rows are each incremented by 1
+     */
+    setRows(rows: Sendable[][], colNumbers: number[], firstIdxId: number = 0) {
         // Identify the columns needed for the index and associate them with the corresponding
         // key tuples
         const entryStructure: [key: (string | symbol | number)[], colIdx: number][] = [];
@@ -50,19 +59,39 @@ export class Index<T extends object> {
             // We're not creating a complete object here because the column selection provided
             // might not include all required properties. To construct just some of the properties
             // we're calling `flattenEntries` instead of `createRecursively`.
-            const map = new Map(flattenEntries(this.ctor, entries, this.context));
+            const entryMap = new Map(flattenEntries(this.ctor, entries, this.context));
             
             // Collect values of indexed properties into array
-            const index = this.indexKeys.map(k => map.get(k));
+            const index = this.indexKeys.map(k => entryMap.get(k));
 
             // Set index for current row.
-            this.set(index, rowIdx + rowOffset);
+            this.set(index, rowIdx + firstIdxId);
         }
 
     }
 
-    set(key: any[], row: number) {
-        throw new Error('Index.set() not yet implemented');
+    /**
+     * Sets the index id for a record
+     * @param idxValues - tuple of index values for a given record/row
+     * @param idxId - numeric index id to be stored for that record
+     */
+    set(idxValues: any[], idxId: number) {
+        // Stringify objects in the key. This may not be the ideal way to compare by value, but 
+        // it's easy, predictable, and relatively efficient.
+        idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
+
+        // Store row number
+        this.map.set(idxValues, idxId);
+    }
+
+    /**
+     * Gets the index id for a record
+     * @param idxValues - tuple of index values for a given record/row
+     * @returns numeric index id stored for that record
+     */
+    get(idxValues: any[]): number | undefined {
+        idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
+        return this.map.get(idxValues);
     }
 }
 
@@ -76,7 +105,7 @@ type TupleMapNode<T> = { value?: T, next: Map<any, TupleMapNode<T>> };
  * TupleMap - map that uses variable-length tuples as keys
  * 
  * This class will probably become obsolete if/when the Records & Tuples Proposal reaches stage 4
- * (see https://github.com/tc39/proposal-record-tuple)
+ * (see https://github.com/tc39/proposal-record-tuple).
  */
 export class TupleMap<T = any> {
     map = new Map<any, TupleMapNode<T>>();
