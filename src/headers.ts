@@ -70,6 +70,21 @@ export class Header<T> {
             return arr;
         }
     }
+
+    getColumnsForTitle(title: string[]): number[] {
+        const arr = [];
+        outer: for (let i = 0; i < this.columns.length; i++) {
+            for (let j = 0; j < title.length; j++) {
+                if (this.columns[i]?.titles[j] !== title[j]) continue outer;
+            }
+            arr.push(i + this.firstCol);
+        }
+        return arr;
+    }
+
+    getKeyForColumns(column: number): (string | symbol | number)[] | undefined {
+        return this.columns[column - this.firstCol]?.keys;
+    }
 }
 
 export interface HeaderLabels {
@@ -257,9 +272,7 @@ export function getHeadersHelper(walker: TableWalker): { branches: Branch[], row
             next = next?.crop(undefined, dataStart.row);
         walker = next ?? walker;
     }
-    console.log(branches);
     const br = findBranches(walker);
-    console.log(br);
     if (br) {
         const { branches: otherBranches, minRowStop, maxRowStop } = br;
         branches = [...branches, ...otherBranches];

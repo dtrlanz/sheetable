@@ -5,23 +5,24 @@ import { Value } from "./values.js";
 import { SheetClient } from "./sheet-server.js";
 import { Index } from "./index.js";
 import { Header } from "./headers.js";
+import { getIndexTitles } from "./title.js";
 
 type TableOptions = {
+    context?: { readonly [k: string]: any },
+    client?: SheetClient,
     url?: string,
     sheetName?: string,
-    context?: { readonly [k: string]: any },
-    sharedIndex?: Table<any>,
-    client?: SheetClient,
+    orientation?: Orientation,
     firstHeaderRow?: number,
     firstDataRow?: number,
     dataRowCount?: number,
     firstColumn?: number,
     columnCount?: number,
-    orientation?: Orientation,
+    sharedIndex?: Table<any>,
     sampleLimit?: number,
 };
 
-class Table<T> {
+class Table<T extends object> {
     readonly ctor: Constructor<T>;
     readonly context: { readonly [k: string]: any };
     private readonly client: SheetClient;
@@ -59,13 +60,25 @@ class Table<T> {
         // }
     }
 
-    static async open<T>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>> {
-        throw new Error('Table.open() not yet implemented');
+    static async open<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>> {
+        const client = options?.client ?? 
+            await SheetClient.fromUrl(options?.url, options?.sheetName, options?.orientation);
+
+        const { headers, data } = await client.get(getIndexTitles(ctor));
+        if (!data) throw new Error('client failed to return index data');
+        const header = Header.open(ctor, headers, options?.context);
+        return new Table(
+            ctor,
+            options?.context ?? {},
+            client,
+            new Index(ctor, header, data),
+            header
+        );
     }
 
-    static async create<T>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>>;
-    static async create<T>(data: Iterable<T>, options?: TableOptions): Promise<Table<T>>;
-    static async create<T>(data: Constructor<T> | Iterable<T>, options?: TableOptions): Promise<Table<T>> {
+    static async create<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>>;
+    static async create<T extends object>(data: Iterable<T>, options?: TableOptions): Promise<Table<T>>;
+    static async create<T extends object>(data: Constructor<T> | Iterable<T>, options?: TableOptions): Promise<Table<T>> {
         throw new Error('Table.create() not yet implemented');
     }
 }

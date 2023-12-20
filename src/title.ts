@@ -1,3 +1,4 @@
+import { getIndexKeys } from "./index.js";
 import { MetaProperty, Constructor } from "./meta-props.js";
 import { getPropConstructor } from "./type.js";
 
@@ -117,4 +118,17 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
     } else {
         return [key, ...tail];
     }
+}
+
+export function getIndexTitles(ctor: Constructor, context?: { readonly [k: string]: any }): string[] {
+    const keys = getIndexKeys(ctor, context);
+    const titleReader = titleProp.getReader(context);
+    return keys.map(k => {
+        const title = titleReader.get(ctor, k);
+        if (title === undefined && typeof k === 'symbol') {
+            throw new Error(`symbol-keyed property ${k.toString()} cannot be used as index unless it also has a string title`);
+        }
+        if (Array.isArray(title)) throw new Error('Properties with array titles are currently not allowed as indices');
+        return title ?? (k as string);
+    });
 }
