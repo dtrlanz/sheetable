@@ -69,3 +69,44 @@ export class Index<T extends object> {
 export function getIndexKeys(ctor: Constructor, context?: { readonly [k: string]: any }): (string | symbol)[] {
     return indexProp.getReader(context).list(ctor);
 }
+
+type TupleMapNode<T> = { value?: T, next: Map<any, TupleMapNode<T>> };
+
+/**
+ * TupleMap - map that uses variable-length tuples as keys
+ * 
+ * This class will probably become obsolete if/when the Records & Tuples Proposal reaches stage 4
+ * (see https://github.com/tc39/proposal-record-tuple)
+ */
+export class TupleMap<T = any> {
+    map = new Map<any, TupleMapNode<T>>();
+
+    set(key: any[], value: T) {
+        let map = this.map;
+        for (let i = 0; i < key.length - 1; i++) {
+            const item = key[i];
+            if (!map.has(item)) {
+                map.set(item, { next: new Map() });
+            }
+            map = map.get(item)!.next;
+        }
+        const last = key.at(-1);
+        if (!map.has(last)) {
+            map.set(last, { value: value, next: new Map() });
+        } else {
+            map.get(last)!.value = value;
+        }
+    }
+
+    get(key: any[]): T | undefined {
+        let map = this.map;
+        for (let i = 0; i < key.length - 1; i++) {
+            const item = key[i];
+            if (!map.has(item)) {
+                return undefined
+            }
+            map = map.get(item)!.next;
+        }
+        return map.get(key.at(-1))?.value;
+    }
+}

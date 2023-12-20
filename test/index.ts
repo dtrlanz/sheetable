@@ -1,5 +1,5 @@
 import test from 'ava';
-import { index, getIndexKeys } from "../src/index.js";
+import { index, getIndexKeys, TupleMap } from "../src/index.js";
 import { title, getIndexTitles } from "../src/title.js";
 
 test('get keys and titles for simple index', t => {
@@ -139,4 +139,40 @@ test('get keys and titles for tuple index', t => {
     }
     t.deepEqual(getIndexKeys(F), ['foo', 'bar', 'baz', sym]);
     t.deepEqual(getIndexTitles(F), ['Foo', 'Bar', 'Baz', 'Sym']);
+});
+
+test('tuple map', t => {
+    const map = new TupleMap();
+    map.set([], '');
+    map.set(['a'], 'a');
+    map.set(['a', 'a'], 'aa');
+    map.set(['a', 'b'], 'ab');
+    map.set(['b'], 'b');
+    map.set(['b', 'a'], 'ba');
+    map.set(['b', 'b'], 'bb');
+    map.set(['b', 'b', 'a'], 'bba');
+    map.set(['b', 'b', 'b'], 'bbb');
+    t.is(map.get([]), '');
+    t.is(map.get(['a']), 'a');
+    t.is(map.get(['a', 'a']), 'aa');
+    t.is(map.get(['a', 'b']), 'ab');
+    t.is(map.get(['b']), 'b');
+    t.is(map.get(['b', 'a']), 'ba');
+    t.is(map.get(['b', 'b']), 'bb');
+    t.is(map.get(['b', 'b', 'a']), 'bba');
+    t.is(map.get(['b', 'b', 'b']), 'bbb');
+    map.set([], 'x');
+    map.set(['a'], 'ax');
+    map.set(['a', 'a'], 'aax');
+    map.set(['b', 'b'], 'bbx');
+    map.set(['b', 'b', 'a'], 'bbax');
+    t.is(map.get([]), 'x');
+    t.is(map.get(['a']), 'ax');
+    t.is(map.get(['a', 'a']), 'aax');
+    t.is(map.get(['a', 'b']), 'ab');
+    t.is(map.get(['b']), 'b');
+    t.is(map.get(['b', 'a']), 'ba');
+    t.is(map.get(['b', 'b']), 'bbx');
+    t.is(map.get(['b', 'b', 'a']), 'bbax');
+    t.is(map.get(['b', 'b', 'b']), 'bbb');
 });
