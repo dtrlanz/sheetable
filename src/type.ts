@@ -62,35 +62,62 @@ export function createRecursively<T extends object>(
     entries: [(string | symbol | number)[], any][], 
     context?: { [k: string]: any; } | undefined
 ): T | T[] | undefined {
-    // Simple entries are those for which a simple key is provided
+    // flatten deep entries by converting them to objects recursively
+    const flatEntries = flattenEntries(ctor, entries, context);
+
+    // if keys provided were numbers, create an array
+    const array: T[] = [];
+    const objEntries: [string | symbol, any][] = [];
+    for (const [k, v] of flatEntries) {
+        if (v === undefined) continue;
+        if (typeof k === 'number') {
+            array[k] = v;
+        } else {
+            objEntries.push([k, v]);
+        }
+    }
+    if (array.length !== 0) {
+        return array;
+    }
+
+    // otherwise construct an object
+    if (ctor) return createFromEntries(ctor, objEntries);
+}
+
+export function flattenEntries(
+    ctor: Constructor | undefined, 
+    entries: [(string | symbol | number)[], any][], 
+    context?: { [k: string]: any; } | undefined
+): Iterable<[string | symbol | number, any]> {
+    // Flat entries are those for which a simple key is provided
     // They can be used directly to construct an object.
     // E.g., `[[key], value]` becomes `{ key: value }`
-    const simple = new Map<string | symbol | number, any>();
+    const flat = new Map<string | symbol | number, any>();
 
-    // Nested entries are those for which key tuples longer than 1 are provided
+    // Deep entries are those for which key tuples longer than 1 are provided
     // The first item of the key tuple indicates the property of the root object. Entries are
     // grouped by this property, the groups used to construct objects, and those objects are
     // used as values of the respective properties in the root object.
     // E.g., `[[key0, key1, key2], value]` becomes `{ key0: { key1: { key2: value } } }`
-    const nested = new Map<string | symbol | number, [(string | symbol | number)[], any][]>();
+    const deep = new Map<string | symbol | number, [(string | symbol | number)[], any][]>();
 
-    // separate nested entries from simple ones
+    // separate deep entries from flat ones
     for (const [k, v] of entries) {
         if (k.length === 0) throw new Error(`invalid entry (key required): ${[k, v]}`);
         if (k.length === 1) {
-            simple.set(k[0], v);
+            flat.set(k[0], v);
         } else {
-            let arr = nested.get(k[0]);
+            let arr = deep.get(k[0]);
             if (!arr) {
                 arr = [];
-                nested.set(k[0], arr);
+                deep.set(k[0], arr);
             }
             arr.push([k.slice(1), v]);
         }
     }
 
     // construct nested objects from nested entries
-    for (const [key, entries] of nested) {
+    for (const [key, entries] of deep) {
         // If nested objects form an array of objects, caller would have passed the necessary 
         // constructor, so pass same constructor on to the next recursion. (If it's an array
         // of primitive values, that constructor value will be ignored anyway.)
@@ -105,24 +132,8 @@ export function createRecursively<T extends object>(
         // If we don't have a specific constructor for the nested object, pass general `Object`
         // constructor as a fallback.
         const value = createRecursively(propCtor ?? Object, entries, context);    
-        simple.set(key, value);
+        flat.set(key, value);
     }
 
-    // if keys provided were numbers, create an array
-    const array: T[] = [];
-    const objEntries: [string | symbol, any][] = [];
-    for (const [k, v] of simple) {
-        if (v === undefined) continue;
-        if (typeof k === 'number') {
-            array[k] = v;
-        } else {
-            objEntries.push([k, v]);
-        }
-    }
-    if (array.length !== 0) {
-        return array;
-    }
-
-    // otherwise construct an object
-    if (ctor) return createFromEntries(ctor, objEntries);
+    return flat.entries();
 }
