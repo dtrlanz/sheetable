@@ -36,6 +36,12 @@ export class Index<T extends object, V> {
         this.indexTitles = getIndexTitles(ctor, context);
     }
 
+    *getIndexedPropsFromObjects(objects: Iterable<T>): Iterable<[any[], T]> {
+        for (const obj of objects) {
+            yield [this.indexKeys.map(k => (obj as any)[k]), obj];
+        }
+    }
+
     /**
      * Converts each row of data to a tuple containing the values of indexed properties in that
      * record. This involves selecting the relevant columns, constructing objects from those 
@@ -47,7 +53,7 @@ export class Index<T extends object, V> {
      * @returns — an iterable of tuples corresponding the input rows, each one containing the
      *  indexed properties of the given record
      */
-    getIndexedProps(rows: Iterable<Sendable[]>, colNumbers: number[]): Iterable<any[]> {
+    *getIndexedPropsFromRows(rows: Iterable<Sendable[]>, colNumbers: number[]): Iterable<any[]> {
         // Identify the columns needed for the index and associate them with the corresponding
         // key tuples
         const entryStructure: [key: (string | symbol | number)[], colIdx: number][] = [];
@@ -60,9 +66,9 @@ export class Index<T extends object, V> {
                 entryStructure.push([keyTuple, colIdx]);
             }
         }
+
         // Process each row of data
-        // TODO: avoid creating unnecessary array
-        return [...rows].map(r => {
+        for (const r of rows) {
             // Collect needed column values into array of entries
             const entries: [(string | symbol | number)[], any][] = [];
             for (const [keyTuple, colIdx] of entryStructure) {
@@ -74,8 +80,8 @@ export class Index<T extends object, V> {
             const entryMap = new Map(flattenEntries(this.ctor, entries, this.context));
             
             // Collect values of indexed properties into array
-            return this.indexKeys.map(k => entryMap.get(k));
-        });
+            yield this.indexKeys.map(k => entryMap.get(k));
+        }
     }
 
     /**

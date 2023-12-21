@@ -5,10 +5,14 @@ import { getObjectPath } from "./title.js";
 export class Header<T> {
     readonly ctor: Constructor<T>;
     readonly context: { readonly [k: string]: any };
-    private firstRow: number;
-    private rowCount: number;
-    private firstCol: number;
+    #firstRow: number;
+    #rowCount: number;
+    #firstCol: number;
     private columns: ({ titles: string[], keys: (string | symbol | number)[] } | undefined)[];
+
+    get firstRow(): number { return this.#firstRow }
+    get rowCount(): number { return this.#rowCount }
+    get firstCol(): number { return this.#firstCol }
 
     private constructor(
         ctor: Constructor<T>, 
@@ -19,9 +23,9 @@ export class Header<T> {
     ) {
         this.ctor = ctor;
         this.context = context;
-        this.firstRow = firstRow;
-        this.rowCount = columns.reduce((max, col) => Math.max(max, col?.titles.length ?? 0), 1);
-        this.firstCol = firstCol;
+        this.#firstRow = firstRow;
+        this.#rowCount = columns.reduce((max, col) => Math.max(max, col?.titles.length ?? 0), 1);
+        this.#firstCol = firstCol;
         this.columns = columns;
     }
 

@@ -6,7 +6,7 @@ import { SheetClient } from "./sheet-server.js";
 import { Index } from "./index.js";
 import { Header } from "./headers.js";
 import { getIndexTitles } from "./title.js";
-import { createRecursively } from "./type.js";
+import { createFromEntries, createRecursively } from "./type.js";
 
 type TableOptions = {
     context?: { readonly [k: string]: any },
@@ -46,22 +46,6 @@ export class Table<T extends object> {
         this.client = client;
         this.header = header;
         this.index = index;
-        
-        // if (typeof data === 'function') {
-        //     this.ctor = data;
-        //     this.context = options.context ?? {};
-        // } else {
-        //     let sampleLimit = options.sampleLimit ?? 1;
-        //     if (sampleLimit < 1) throw new Error(`sampleLimit: ${sampleLimit} is invalid; must be >= 1`);
-        //     const samples = [];
-        //     for (const sample of data) {
-        //         samples.push(sample);
-        //         if (--sampleLimit < 1) break;
-        //     }
-        //     if (samples.length < 1) throw new Error('Error constructing Table: data was empty; consider passing a class instead');
-        //     this.ctor = Object.getPrototypeOf(samples[0]).constructor;
-        //     this.header = Header.create(this.ctor, samples, options.context);
-        // }
     }
 
     static async open<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>> {
@@ -70,6 +54,7 @@ export class Table<T extends object> {
 
         const { headers, data } = await client.get(getIndexTitles(ctor));
         if (!data) throw new Error('client failed to return index data');
+
         // Create data structures for header, index, and table
         const header = Header.open(ctor, headers, options?.context);
         const index = new Index<T, Slot<T>>(ctor, header, options?.context);
@@ -80,12 +65,13 @@ export class Table<T extends object> {
             header,
             index,
         );
+
         // Initialize index
         let row = data.rowOffset;
-        for (const idxValues of index.getIndexedProps(data.rows, data.colNumbers)) {
+        for (const idxValues of index.getIndexedPropsFromRows(data.rows, data.colNumbers)) {
             // Note that initialization might be unsuccessful (in case of index collisions)
             index.init(idxValues, () => {
-                // increment `idx` only when element is actually initialized
+                // increment `idx` only if element is actually initialized
                 const slot = { idx: table.slots.length, row };
                 table.slots.push(slot);
                 return slot;
@@ -93,13 +79,66 @@ export class Table<T extends object> {
             // increment `row` regardless of whether initialization takes place
             row++;
         }
+
         return table;
     }
 
     static async create<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>>;
     static async create<T extends object>(data: Iterable<T>, options?: TableOptions): Promise<Table<T>>;
     static async create<T extends object>(data: Constructor<T> | Iterable<T>, options?: TableOptions): Promise<Table<T>> {
-        throw new Error('Table.create() not yet implemented');
+        const client = options?.client ?? 
+            await SheetClient.fromUrl(options?.url, options?.sheetName, options?.orientation);
+
+        // Get constructor from sample data or use constructor to create sample data
+        let ctor: Constructor<T>;
+        const samples: T[] = [];
+        if (typeof data === 'function') {
+            ctor = data;
+            data = [];
+            const obj = createFromEntries(ctor, []);
+            if (!obj) throw new Error('Error constructing sample object; consider passing instances instead of class, implementing a zero-argument constructor, or adding a static factory method `fromEntries()`');
+            samples.push(obj);
+        } else {
+            let sampleLimit = options?.sampleLimit ?? 1;
+            if (sampleLimit < 1) throw new Error(`sampleLimit: ${sampleLimit} is invalid; must be >= 1`);
+            for (const obj of data) {
+                samples.push(obj);
+                if (--sampleLimit < 1) break;
+            }
+            if (samples.length < 1) throw new Error('Error constructing Table: data was empty; consider passing a class instead');
+            ctor = Object.getPrototypeOf(samples[0]).constructor;
+        }
+
+        // Create data structures for header, index, and table
+        const header = Header.create(ctor, samples, options?.context, options?.firstHeaderRow, options?.firstColumn);
+        const index = new Index<T, Slot<T>>(ctor, header, options?.context);
+        const table = new Table(
+            ctor,
+            options?.context ?? {},
+            client,
+            header,
+            index,
+        );
+        
+        // Initialize index
+        let row = header.firstRow + header.rowCount;
+        for (const [idxValues, obj] of index.getIndexedPropsFromObjects(data)) {
+            // Note that initialization might be unsuccessful (in case of index collisions)
+            index.init(idxValues, () => {
+                const slot = { 
+                    // increment `idx` only if element is actually initialized
+                    idx: table.slots.length, 
+                    row, 
+                    cached: obj 
+                };
+                table.slots.push(slot);
+                return slot;
+            });
+            // increment `row` regardless of whether initialization takes place
+            row++;
+        }
+        
+        return table;
     }
 
     async at(idx: number): Promise<T | undefined> {

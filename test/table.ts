@@ -66,3 +66,23 @@ test('open table', async t => {
     }
     t.is(await table.get({ a1: 0, a2: 0}, 0), undefined);
 });
+
+test('create table', async t => {
+    const data = [0, 1, 2, 3, 4, 5, 6].map(i => toObj(i * 10));
+    const table = await Table.create(data, { client: SheetClient.fromSheet(sheet``) });
+    // retrieve nth item
+    for (let i = 0; i < 7; i++) {
+        t.deepEqual(await table.at(i), toObj(i * 10));
+    }
+    t.is(await table.at(7), undefined);
+    // retrieve nth-last item
+    for (let i = -1; i >= -7; i--) {
+        t.deepEqual(await table.at(i), toObj((7 + i) * 10));
+    }
+    t.is(await table.at(-8), undefined);
+    // retrieve item by indexed properties
+    for (let i = 0; i < 70; i += 10) {
+        t.deepEqual(await table.get({ a1: i, a2: i + 1}, i + 2), toObj(i));
+    }
+    t.is(await table.get({ a1: 0, a2: 0}, 0), undefined);
+});
