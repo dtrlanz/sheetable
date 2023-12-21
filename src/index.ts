@@ -122,13 +122,13 @@ export class Index<T extends object, V> {
     }
 
     /**
-     * Gets the element associated with an indexed record
-     * @param idxValues — tuple of index values for a given record
-     * @returns — element associated with that record, if any, otherwise `undefined`
+     * Gets the element associated with an indexed record.
+     * @param indexedValues — values of indexed properties for a given record
+     * @returns — element associated with that record, if any; otherwise `undefined`
      */
-    get(idxValues: any[]): V | undefined {
-        idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
-        return this.map.get(idxValues);
+    get(indexedValues: any[]): V | undefined {
+        indexedValues = indexedValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
+        return this.map.get(indexedValues);
     }
 }
 

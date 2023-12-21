@@ -285,13 +285,13 @@ export class SheetClient {
         }) as Promise<{ headers: Branch[], data: SheetResponse['data'] }>; 
     }
 
-    async getRows(rowStart?: number, rowStop?: number): Promise<SheetResponse['data']> {
+    async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Sendable[][], colNumbers: number[], rowOffset: number }> {
         const { data } = await this.request({
             orientation: this.orientation,
             limit: this.range,
             getHeaders: false,
             getData: { rowStart, rowStop },
         });
-        return data;
+        return data!;
     }
 }
