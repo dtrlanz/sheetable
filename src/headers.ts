@@ -1,6 +1,6 @@
 import { Constructor } from "./meta-props.js";
 import { Region, TableWalker } from "./sheet-navigation.js";
-import { getObjectPath } from "./title.js";
+import { getKeysWithTitles, getObjectPath } from "./title.js";
 
 export class Header<T> {
     readonly ctor: Constructor<T>;
@@ -19,7 +19,7 @@ export class Header<T> {
         context: { readonly [k: string]: any },
         columns: ({ titles: string[], keys: (string | symbol | number)[] } | undefined)[],
         firstRow: number,
-        firstCol: number
+        firstCol: number,
     ) {
         this.ctor = ctor;
         this.context = context;
@@ -29,14 +29,50 @@ export class Header<T> {
         this.columns = columns;
     }
 
-    static create<T>(
+    static create<T extends object>(
         ctor: Constructor<T>, 
         samples: Iterable<T>, 
         context: { readonly [k: string]: any } = {}, 
         firstRow: number = 1, 
-        firstColumn: number = 1
+        firstColumn: number = 1,
     ): Header<T> {
-        throw new Error('Header.create() not yet implemented');
+        const branches: Branch[] = [];
+        for (const obj of samples) {
+            for (const [_, title] of getKeysWithTitles(obj, context)) {
+                addBranch(branches, firstRow, title);
+            }
+        }
+        numberColumns(branches, firstColumn);
+
+        // seems slightly inefficient (the columns just converted to branches will be converted 
+        // back to columns)
+        return Header.open(ctor, branches, context);
+
+        function addBranch(branches: Branch[], row: number, title: string[]) {
+            if (title.length === 0) return;
+            let match = branches.find(b => b.label === title[0]);
+            if (!match) {
+                match = {
+                    label: title[0],
+                    row,
+                    start: 0,
+                    stop: 0,
+                    children: [],
+                };
+                branches.push(match);
+            }
+            addBranch(match.children, row + 1, title.slice(1));
+        }
+
+        function numberColumns(branches: Branch[], col: number): number {
+            if (branches.length === 0) return col + 1;
+            for (const branch of branches) {
+                branch.start = col;
+                col = numberColumns(branch.children, col);
+                branch.stop = col;
+            }
+            return col;
+        }
     }
 
     static open<T>(
