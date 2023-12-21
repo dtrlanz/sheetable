@@ -1,6 +1,7 @@
 import { getIndexKeys } from "./index.js";
 import { MetaProperty, Constructor } from "./meta-props.js";
 import { getPropConstructor } from "./type.js";
+import { isComplex } from "./values.js";
 
 const titleProp = new MetaProperty<string | string[]>('title');
 const spreadProp = new MetaProperty<boolean>('spread');
@@ -15,6 +16,126 @@ export function title(title: string, ...rest: string[]) {
     } else {
         return titleProp.getDecorator([title, ...rest]);
     }
+}
+
+export function getKeysWithTitles(obj: object, context?: { [k: string]: any }): [key: (string | symbol | number)[], title: string[]][] {
+    const ctor = Object.getPrototypeOf(obj).constructor;
+    const toBeSpread = new Set(spreadProp.getReader(context).list(ctor));
+    const restList = restProp.getReader(context).list(obj);
+    if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
+    const restKey = restList.at(0);
+    const titleReader = titleProp.getReader(context);
+
+    // `enumerableProps` includes, more specifically, own enumerable string-keyed properties
+    const enumerableProps = Object.entries(obj)
+        .map(([key, value]) => [key, value, titleReader.get(obj, key)] as const);
+    // `titleProps` includes all properties with a @title decorator not included in `enumerableProps`
+    const titleProps = titleReader.entries(ctor)
+        .filter(([key]) => (typeof key === 'symbol' && key in obj || !Object.getOwnPropertyDescriptor(obj, key)?.enumerable))
+        .map(([key, title]) => [key, (obj as any)[key], title] as const);
+
+    const arr: [key: (string | symbol | number)[], title: string[]][] = [];
+    for (let [key, value, title] of [...enumerableProps, ...titleProps]) {
+        if (isComplex(value)) {
+            // Complex types (i.e., objects incl. arrays)
+            if (typeof value === 'function') {
+                // functions not supported
+                console.warn(`functions are not supported: { ${String(key)}: ${value} }`);
+                continue;
+            }
+            if (toBeSpread.has(key)) {
+                if (Array.isArray(value)) {
+                    // When spreading arrays, multiple titles are expected
+                    if (Array.isArray(title)) {
+                        // Process arrays item by item
+                        for (let i = 0; i < title.length && i < value.length; i++) {
+                            if (isComplex(value[i])) {
+                                // Get keys & titles of nested object recursively
+                                for (const [keyTail, titleTail] of getKeysWithTitles(value[i], context)) {
+                                    arr.push([[key, i, ...keyTail], [title[i], ...titleTail]]);
+                                }
+                            } else {
+                                // Non-complex value, no recursion needed
+                                arr.push([[key, i], [title[i]]]);
+                            }
+                        }
+                    } else {
+                        // on import, data would not be recognized as array
+                        throw new Error(`array spreading requires multiple titles, e.g., @title('Title 1', 'Title 2', ...): { ${String(key)}: ${value} }`);
+                    }
+                } else {
+                    if (Array.isArray(title)) {
+                        // title arrays are only relevant for array spreading, not for object spreading
+                        console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored for non-array objects.`);
+                        title = title[0];
+                    }
+                    // `enumerableProps` contains only string keys; symbolProps contains only keys with valid title string
+                    if (title === undefined && typeof key === 'symbol') throw new Error('unreachable');
+                    title ??= key as string;
+                    // Get keys & titles of nested object recursively
+                    for (const [keyTail, titleTail] of getKeysWithTitles(value, context)) {
+                        arr.push([[key, ...keyTail], titleTail]);
+                    }
+                }
+            } else {
+                if (restKey === key) {
+                    // @rest decorator without @spread is ignored
+                    console.warn(`@rest decorator is ignored unless accompanied by @spread: { ${String(key)}: ${value} }`);
+                } 
+                if (Array.isArray(title)) {
+                    // non-initial titles are ignored without @spread
+                    console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                    title = title[0];
+                }
+                // `enumerableProps` contains only string keys; symbolProps contains only keys with valid title string
+                if (title === undefined && typeof key === 'symbol') throw new Error('unreachable');
+                title ??= key as string;
+                // Just a nested object (no array/object spreading involved)
+                if (Array.isArray(value)) {
+                    // Process arrays item by item
+                    for (let i = 0; i < value.length; i++) {
+                        if (isComplex(value[i])) {
+                            // Get keys & titles of nested object recursively
+                            for (const [keyTail, titleTail] of getKeysWithTitles(value[i], context)) {
+                                arr.push([[key, i, ...keyTail], [title, `${i}`, ...titleTail]]);
+                            }
+                        } else {
+                            // Non-complex value, no recursion needed
+                            arr.push([[key, i], [title, `${i}`]]);
+                        }
+                    }
+                } else {
+                    // Get keys & titles of nested object recursively
+                    for (const [keyTail, titleTail] of getKeysWithTitles(value, context)) {
+                        arr.push([[key, ...keyTail], [title, ...titleTail]]);
+                    }
+                }
+            }
+
+        } else {
+            // Non-complex types (i.e., primitive types & Date)
+            if (toBeSpread.has(key)) {
+                // @spread decorator would cause re-import to ignore title
+                throw new Error(`@spread cannot be applied to scalar value: { ${String(key)}: ${value} }`);
+            }
+            if (restKey === key) {
+                // @rest decorator without @spread is ignored
+                // would not cause re-import to fail, so a warning is sufficient here
+                console.warn(`@rest decorator is ignored unless accompanied by @spread: { ${String(key)}: ${value} }`);
+            } 
+            if (Array.isArray(title)) {
+                // non-initial titles are ignored without @spread
+                // would not cause re-import to fail, so a warning is sufficient here
+                console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                title = title[0];
+            }
+            // `enumerableProps` contains only string keys; symbolProps contains only keys with valid title string
+            if (title === undefined && typeof key === 'symbol') throw new Error('unreachable');
+            title ??= key as string;
+            arr.push([[key], [title]]);
+        }
+    }
+    return arr;
 }
 
 export function getObjectPath(title: string[], obj: object | Constructor, context?: { [k: string]: any }, includeRest: boolean = true): (string | symbol | number)[] | undefined {
@@ -48,7 +169,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
                     map.set(value[idx], { key, idx })
                 }
             } else {
-                console.warn(`Rest titles [${value.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                console.warn(`Additional titles [${value.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
                 map.set(value[0], { key });
             }
         }

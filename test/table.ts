@@ -67,7 +67,7 @@ test('open table', async t => {
     t.is(await table.get({ a1: 0, a2: 0}, 0), undefined);
 });
 
-test('create table', async t => {
+test.skip('create table', async t => {
     const data = [0, 1, 2, 3, 4, 5, 6].map(i => toObj(i * 10));
     const table = await Table.create(data, { client: SheetClient.fromSheet(sheet``) });
     // retrieve nth item

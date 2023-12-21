@@ -8,6 +8,11 @@ export function isScalar(value: any): value is Scalar {
         || value === undefined || value instanceof Date;
 }
 
+export function isComplex(value: any): boolean {
+    // TODO: address cases like bigint
+    return !isScalar(value);
+}
+
 export type Value = Scalar | Value[] | { [k: string]: Value };
 
 // todo
