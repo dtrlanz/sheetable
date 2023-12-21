@@ -1,5 +1,5 @@
 import test from 'ava';
-import { title, spread, rest, getObjectPath } from "../src/title.js";
+import { title, spread, rest, getObjectPath, getKeysWithTitles } from "../src/title.js";
 
 test('simple title conversion', t => {
     class ClassA {
@@ -14,11 +14,23 @@ test('simple title conversion', t => {
     t.deepEqual(getObjectPath(['Bar'], ClassA), ['bar']);
     t.deepEqual(getObjectPath(['Baz'], ClassA), ['Baz'], 'use title as fallback');
 
-    const objA = new ClassA();
+    let objA = new ClassA();
     t.deepEqual(getObjectPath(['Foo'], objA), ['foo']);
     t.deepEqual(getObjectPath(['Bar'], objA), ['bar']);
     t.deepEqual(getObjectPath(['Baz'], objA), ['Baz'], 'use title as fallback');
 
+    t.deepEqual(getKeysWithTitles(objA), [
+        [['foo'], ['Foo']],
+        [['bar'], ['Bar']],
+    ]);
+    (objA as any).Baz = 42;
+    t.deepEqual(getKeysWithTitles(objA), [
+        [['foo'], ['Foo']],
+        [['bar'], ['Bar']],
+        [['Baz'], ['Baz']],
+    ]);
+
+    objA = new ClassA();
     const mySymbol = Symbol('mySymbol');
     class ClassB {
         @title('Apples')
@@ -43,6 +55,15 @@ test('simple title conversion', t => {
     t.deepEqual(getObjectPath(['Apples', 'Baz'], ClassB), ['a', 'Baz'], 'use title as fallback');
     t.deepEqual(getObjectPath(['Oranges'], ClassB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], ClassB), [mySymbol]);
+
+    t.deepEqual(getKeysWithTitles(objB), [
+        [['a', 'foo'], ['Apples', 'Foo']],
+        [['a', 'bar'], ['Apples', 'Bar']],
+        [['a', 'foo'], ['Apples', 'Foo']],
+        [['a', 'bar'], ['Apples', 'Bar']],
+        [['b'], ['Oranges']],
+        [[mySymbol], ['Bicycles']],
+    ]);
 });
 
 test('array spreading', t => {
@@ -59,6 +80,14 @@ test('array spreading', t => {
     t.deepEqual(getObjectPath(['C'], ClassA), ['foo', 2]);
     t.deepEqual(getObjectPath(['D'], ClassA), ['foo', 3]);
     t.deepEqual(getObjectPath(['Bar'], ClassA), ['bar']);
+
+    t.deepEqual(getKeysWithTitles(new ClassA()), [
+        [['foo', 0], ['A']],
+        [['foo', 1], ['B']],
+        [['foo', 2], ['C']],
+        [['foo', 3], ['D']],
+        [['bar'], ['Bar']],
+    ]);
 
     const objA = new ClassA();
     const mySymbol = Symbol('mySymbol');
@@ -78,8 +107,19 @@ test('array spreading', t => {
     t.deepEqual(getObjectPath(['Apples', 'B'], objB), ['a', 'foo', 1]);
     t.deepEqual(getObjectPath(['Apples', 'C'], objB), ['a', 'foo', 2]);
     t.deepEqual(getObjectPath(['Apples', 'D'], objB), ['a', 'foo', 3]);
+    t.deepEqual(getObjectPath(['Apples', 'Bar'], objB), ['a', 'bar']);
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
+
+    t.deepEqual(getKeysWithTitles(objB), [
+        [['a', 'foo', 0], ['Apples', 'A']],
+        [['a', 'foo', 1], ['Apples', 'B']],
+        [['a', 'foo', 2], ['Apples', 'C']],
+        [['a', 'foo', 3], ['Apples', 'D']],
+        [['a', 'bar'], ['Apples', 'Bar']],
+        [['b'], ['Oranges']],
+        [[mySymbol], ['Bicycles']],
+    ]);
 });
 
 test('object spreading', t => {
@@ -111,6 +151,28 @@ test('object spreading', t => {
     t.deepEqual(getObjectPath(['Apples', 'Foo'], objB), ['Apples', 'Foo']);
     t.deepEqual(getObjectPath(['Apples', 'Bar'], objB), ['Apples', 'Bar']);
 
+    t.deepEqual(getKeysWithTitles(objB), [
+        [['a', 'foo'], ['Foo']],
+        [['a', 'bar'], ['Bar']],
+        [['b'], ['Oranges']],
+    ]);
+
+    const objBB = new ClassB();
+    const objAB = new ClassA();
+    (objAB as any).baz = 'blue';
+    objBB.a = objAB;
+    (objBB as any).c = true;
+
+    t.deepEqual(getKeysWithTitles(objBB), [
+        [['a', 'foo'], ['Foo']],
+        [['a', 'bar'], ['Bar']],
+        // cannot be included: on import, this would be assigned to `objBB.baz`
+        [['a', 'baz'], ['baz']],
+        [['b'], ['Oranges']],
+        // can be included: on import, this will be assigned to `objBB.c`
+        [['c'], ['c']],
+    ]);
+
     class ClassC {
         @spread
         @title('Onions', 'Tomatoes')
@@ -140,6 +202,39 @@ test('object spreading', t => {
     t.deepEqual(getObjectPath(['Bar'], objC), ['b', 'a', 'bar'], 'should match (spread deeply)');
     t.deepEqual(getObjectPath(['Oranges'], objC), ['b', 'b']);
     t.deepEqual(getObjectPath(['Oranges', 'Foo'], objC), ['b', 'b', 'Foo']);
+
+    t.deepEqual(getKeysWithTitles(objC), [
+        [['a', 0, 'foo'], ['Onions', 'Foo']],
+        [['a', 0, 'bar'], ['Onions', 'Bar']],
+        [['a', 1, 'foo'], ['Tomatoes', 'Foo']],
+        [['a', 1, 'bar'], ['Tomatoes', 'Bar']],
+        [['b', 'a', 'foo'], ['Foo']],
+        [['b', 'a', 'bar'], ['Bar']],
+        [['b', 'b'], ['Oranges']],
+    ]);
+
+    const objCC = new ClassC();
+    objCC.a = [objAB, objAB];
+    objCC.b = objBB;
+    (objCC as any).c = 0;
+
+    t.deepEqual(getKeysWithTitles(objCC), [
+        [['a', 0, 'foo'], ['Onions', 'Foo']],
+        [['a', 0, 'bar'], ['Onions', 'Bar']],
+        // can be included: adequately identified due to array spreading titles
+        [['a', 0, 'baz'], ['Onions', 'baz']],
+        [['a', 1, 'foo'], ['Tomatoes', 'Foo']],
+        [['a', 1, 'bar'], ['Tomatoes', 'Bar']],
+        // can be included: adequately identified due to array spreading titles
+        [['a', 1, 'baz'], ['Tomatoes', 'baz']],
+        [['b', 'a', 'foo'], ['Foo']],
+        [['b', 'a', 'bar'], ['Bar']],
+        // cannot be included: on import, this would be assigned to `objCC.baz`
+        // [['b', 'a', 'baz'], ['baz']],
+        [['b', 'b'], ['Oranges']],
+        // can be included: on import, this will be assigned to `objCC.c`
+        [['c'], ['c']]
+    ]);
 });
 
 test('rest collection', t => {
@@ -155,6 +250,16 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Baz'], objA, undefined, true), ['Baz']);
     t.deepEqual(getObjectPath(['Baz'], objA, undefined, false), undefined);
 
+    const objAA = new ClassA();
+    (objAA as any).baz = 25;
+
+    t.deepEqual(getKeysWithTitles(objAA), [
+        [['foo'], ['Foo']],
+        [['bar'], ['Bar']],
+        // can be included: neither @spread nor @rest apply
+        [['baz'], ['baz']],
+    ])
+
     class ClassB {
         @spread @rest
         a = objA;
@@ -168,6 +273,29 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Bar'], objB), ['a', 'bar']);
     t.deepEqual(getObjectPath(['Apples'], objB), ['b']);
     t.deepEqual(getObjectPath(['Baz'], objB), ['a', 'Baz'], 'unmatched titles should be assigned to a');
+
+    t.deepEqual(getKeysWithTitles(objB), [
+        [['a', 'foo'], ['Foo']],
+        [['a', 'bar'], ['Bar']],
+        [['b'], ['Apples']],
+    ]);
+
+    const objBB = new ClassB();
+    const objAB = new ClassA();
+    (objAB as any).baz = 25;
+    objBB.a = objAB;
+    (objBB as any).c = 0;
+
+    t.deepEqual(getKeysWithTitles(objBB), [
+        [['a', 'foo'], ['Foo']],
+        [['a', 'bar'], ['Bar']],
+        // can be included: both @spread and @rest apply
+        [['a', 'baz'], ['baz']],
+        [['b'], ['Apples']],
+        // cannot be included due to @rest
+        // on import, this property would be assigned to `objBB.a.c`
+        //[['c'], ['c']],
+    ]);
 
     class ClassC {
         x = 25;
@@ -184,6 +312,31 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Bar'], objC), ['y', 'a', 'bar']);
     t.deepEqual(getObjectPath(['Baz'], objC), ['y', 'a', 'Baz'], 'unmatched titles should be assigned to y.a');
 
+    t.deepEqual(getKeysWithTitles(objC), [
+        [['x'], ['x']],
+        [['y', 'a', 'foo'], ['Foo']],
+        [['y', 'a', 'bar'], ['Bar']],
+        [['y', 'b'], ['Apples']],
+    ]);
+
+    const objCC = new ClassC();
+    objCC.y = objBB;
+    (objCC as any).z = 4;
+
+    t.deepEqual(getKeysWithTitles(objCC), [
+        [['x'], ['x']],
+        [['y', 'a', 'foo'], ['Foo']],
+        [['y', 'a', 'bar'], ['Bar']],
+        // can be included: both @spread and @rest apply
+        [['y', 'a', 'baz'], ['baz']],
+        [['y', 'b'], ['Apples']],
+        // cannot be included due to @rest
+        // on import, this property would be assigned to `objCC.y.a.c`
+        //[['y', 'c'], ['c']],
+        // on import, this property would be assigned to `objCC.y.a.z`
+        //[['z'], ['z']]
+    ]);
+
     class ClassD {
         x = 25;
 
@@ -196,6 +349,24 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Foo'], objD), ['y', 'a', 'foo']);
     t.deepEqual(getObjectPath(['Bar'], objD), ['y', 'a', 'bar']);
     t.deepEqual(getObjectPath(['Baz'], objD), ['Baz'], 'unmatched titles should be retained at top level');
+
+    const objDD = new ClassD();
+    objDD.y = objBB;
+    (objDD as any).z = 4;
+
+    t.deepEqual(getKeysWithTitles(objDD), [
+        [['x'], ['x']],
+        [['y', 'a', 'foo'], ['Foo']],
+        [['y', 'a', 'bar'], ['Bar']],
+        [['y', 'b'], ['Apples']],
+        // cannot be included due to @spread without @rest
+        // on import, this property would be assigned to `objDD.c`
+        // [['y', 'a', 'baz'], ['baz']],
+        // on import, this property would be assigned to `objDD.c`
+        // [['y', 'c'], ['c']],
+        // can be included: without @rest, extra properties are retained at the root level
+        [['z'], ['z']]
+    ]);
 
     class ClassE {
         @spread @rest
