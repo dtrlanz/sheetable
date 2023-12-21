@@ -133,7 +133,7 @@ test('array spreading', t => {
     ]);
 });
 
-test.only('object spreading', t => {
+test('object spreading', t => {
     class ClassA {
         @title('Foo')
         foo = 3.14;
@@ -178,7 +178,7 @@ test.only('object spreading', t => {
         [['a', 'foo'], ['Foo']],
         [['a', 'bar'], ['Bar']],
         // cannot be included: on import, this would be assigned to `objBB.baz`
-        [['a', 'baz'], ['baz']],
+        // [['a', 'baz'], ['baz']],
         [['b'], ['Oranges']],
         // can be included: on import, this will be assigned to `objBB.c`
         [['c'], ['c']],
@@ -231,13 +231,13 @@ test.only('object spreading', t => {
 
     t.deepEqual(getKeysWithTitles(objCC), [
         [['a', 0, 'foo'], ['Onions', 'Foo']],
-        [['a', 0, 'bar'], ['Onions', 'Bar']],
         // can be included: adequately identified due to array spreading titles
         [['a', 0, 'baz'], ['Onions', 'baz']],
+        [['a', 0, 'bar'], ['Onions', 'Bar']],   // order: accessors after own properties
         [['a', 1, 'foo'], ['Tomatoes', 'Foo']],
-        [['a', 1, 'bar'], ['Tomatoes', 'Bar']],
         // can be included: adequately identified due to array spreading titles
         [['a', 1, 'baz'], ['Tomatoes', 'baz']],
+        [['a', 1, 'bar'], ['Tomatoes', 'Bar']], // order: accessors after own properties
         [['b', 'a', 'foo'], ['Foo']],
         [['b', 'a', 'bar'], ['Bar']],
         // cannot be included: on import, this would be assigned to `objCC.baz`
@@ -266,9 +266,9 @@ test('rest collection', t => {
 
     t.deepEqual(getKeysWithTitles(objAA), [
         [['foo'], ['Foo']],
-        [['bar'], ['Bar']],
         // can be included: neither @spread nor @rest apply
         [['baz'], ['baz']],
+        [['bar'], ['Bar']], // order: accessors after own properties
     ])
 
     class ClassB {
@@ -299,9 +299,9 @@ test('rest collection', t => {
 
     t.deepEqual(getKeysWithTitles(objBB), [
         [['a', 'foo'], ['Foo']],
-        [['a', 'bar'], ['Bar']],
         // can be included: both @spread and @rest apply
         [['a', 'baz'], ['baz']],
+        [['a', 'bar'], ['Bar']], // order: accessors after own properties
         [['b'], ['Apples']],
         // cannot be included due to @rest
         // on import, this property would be assigned to `objBB.a.c`
@@ -337,9 +337,9 @@ test('rest collection', t => {
     t.deepEqual(getKeysWithTitles(objCC), [
         [['x'], ['x']],
         [['y', 'a', 'foo'], ['Foo']],
-        [['y', 'a', 'bar'], ['Bar']],
         // can be included: both @spread and @rest apply
         [['y', 'a', 'baz'], ['baz']],
+        [['y', 'a', 'bar'], ['Bar']],   // order: accessors after own properties
         [['y', 'b'], ['Apples']],
         // cannot be included due to @rest
         // on import, this property would be assigned to `objCC.y.a.c`

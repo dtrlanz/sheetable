@@ -1,6 +1,6 @@
 import { getIndexKeys } from "./index.js";
 import { MetaProperty, Constructor } from "./meta-props.js";
-import { getPropConstructor } from "./type.js";
+import { createFromEntries, getPropConstructor } from "./type.js";
 import { isComplex } from "./values.js";
 
 const titleProp = new MetaProperty<string | string[]>('title');
@@ -18,8 +18,9 @@ export function title(title: string, ...rest: string[]) {
     }
 }
 
-export function getKeysWithTitles(obj: object, context?: { [k: string]: any }): [key: (string | symbol | number)[], title: string[]][] {
+export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, includeRest: boolean = true): [key: (string | symbol | number)[], title: string[]][] {
     const ctor = Object.getPrototypeOf(obj).constructor;
+    const sample = createFromEntries(ctor, []) as object;
     const toBeSpread = new Set(spreadProp.getReader(context).list(ctor));
     const restList = restProp.getReader(context).list(obj);
     if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
@@ -29,13 +30,18 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }): 
     // `enumerableProps` includes, more specifically, own enumerable string-keyed properties
     const enumerableProps = Object.entries(obj)
         .map(([key, value]) => [key, value, titleReader.get(obj, key)] as const);
-    // `titleProps` includes all properties with a @title decorator not included in `enumerableProps`
+    // `titleProps` includes all properties with @title decorator not included in `enumerableProps`
     const titleProps = titleReader.entries(ctor)
         .filter(([key]) => (typeof key === 'symbol' && key in obj || !Object.getOwnPropertyDescriptor(obj, key)?.enumerable))
         .map(([key, title]) => [key, (obj as any)[key], title] as const);
 
     const arr: [key: (string | symbol | number)[], title: string[]][] = [];
     for (let [key, value, title] of [...enumerableProps, ...titleProps]) {
+        // Known properties are those which are present in a default instance.
+        // Unknown properties are only included in results if `includeRest === true` 
+        // and none of the other properties are decorated with @rest.
+        if (!(key in sample || (includeRest && restKey === undefined))) continue;
+
         if (isComplex(value)) {
             // Complex types (i.e., objects incl. arrays)
             if (typeof value === 'function') {
@@ -67,13 +73,9 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }): 
                     if (Array.isArray(title)) {
                         // title arrays are only relevant for array spreading, not for object spreading
                         console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored for non-array objects.`);
-                        title = title[0];
                     }
-                    // `enumerableProps` contains only string keys; symbolProps contains only keys with valid title string
-                    if (title === undefined && typeof key === 'symbol') throw new Error('unreachable');
-                    title ??= key as string;
                     // Get keys & titles of nested object recursively
-                    for (const [keyTail, titleTail] of getKeysWithTitles(value, context)) {
+                    for (const [keyTail, titleTail] of getKeysWithTitles(value, context, includeRest && key === restKey)) {
                         arr.push([[key, ...keyTail], titleTail]);
                     }
                 }
@@ -178,6 +180,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
     let found = map.get(title[0]);
     if (!found) {
         // Title mapping not defined. Try using title directly as property key.
+        // TODO: check this (seems wild)
         const objOrPrototype = typeof obj === 'object' ? obj : Object.getPrototypeOf(obj);
         if (title[0] in objOrPrototype) {
             found ??= { key: title[0] };
