@@ -7,13 +7,20 @@ import { Sendable } from "./values.js";
 const indexProp = new MetaProperty('index');
 export const index = indexProp.getDecorator(true);
 
-export class Index<T extends object> {
+/**
+ * Index — dinstinguishes a set of records by their indexed properties and associates a given
+ *  value with each record in a map-like structure.
+ * 
+ * T — the type of records that are to be indexed
+ * V — the type of value to be associated with each record
+ */
+export class Index<T extends object, V> {
     ctor: Constructor<T>;
     context?: { readonly [k: string]: any };
     header: Header<T>;
     indexKeys: (string | symbol)[];
     indexTitles: string[];
-    map = new TupleMap<number>();
+    map = new TupleMap<V>();
 
     constructor(
         ctor: Constructor<T>, 
@@ -24,19 +31,23 @@ export class Index<T extends object> {
         this.context = context;
         this.header = header;
         // TODO: avoid calling getIndexKeys() twice
+        // (thrice, actually, if calling from `Table.open()`)
         this.indexKeys = getIndexKeys(ctor, context);
         this.indexTitles = getIndexTitles(ctor, context);
     }
 
     /**
-     * Sets the index ids for multiple rows of data
-     * @param rows - 2-dimensional array of row data
-     * @param colNumbers - 1-dimensional numeric array identifying column numbers 
-     *  corresponding to 2nd dimension of `rows` array
-     * @param firstIdxId - numeric index id to be stored for the first row in the `rows` array
-     *  (default: 0); index numbers of subsequent rows are each incremented by 1
+     * Converts each row of data to a tuple containing the values of indexed properties in that
+     * record. This involves selecting the relevant columns, constructing objects from those 
+     * column values where needed, and returning the result as a tuple.
+     * @param rows — an iterable or rows; each row is an array whose elements correspond to table
+     *  columns
+     * @param colNumbers — a numeric array identifying the column numbers corresponding to the
+     *  elements in each row of data
+     * @returns — an iterable of tuples corresponding the input rows, each one containing the
+     *  indexed properties of the given record
      */
-    setRows(rows: Sendable[][], colNumbers: number[], firstIdxId: number = 0) {
+    getIndexedProps(rows: Iterable<Sendable[]>, colNumbers: number[]): Iterable<any[]> {
         // Identify the columns needed for the index and associate them with the corresponding
         // key tuples
         const entryStructure: [key: (string | symbol | number)[], colIdx: number][] = [];
@@ -50,11 +61,12 @@ export class Index<T extends object> {
             }
         }
         // Process each row of data
-        for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+        // TODO: avoid creating unnecessary array
+        return [...rows].map(r => {
             // Collect needed column values into array of entries
             const entries: [(string | symbol | number)[], any][] = [];
             for (const [keyTuple, colIdx] of entryStructure) {
-                entries.push([keyTuple, rows[rowIdx][colIdx]]);
+                entries.push([keyTuple, r[colIdx]]);
             }
             // We're not creating a complete object here because the column selection provided
             // might not include all required properties. To construct just some of the properties
@@ -62,34 +74,59 @@ export class Index<T extends object> {
             const entryMap = new Map(flattenEntries(this.ctor, entries, this.context));
             
             // Collect values of indexed properties into array
-            const index = this.indexKeys.map(k => entryMap.get(k));
-
-            // Set index for current row.
-            this.set(index, rowIdx + firstIdxId);
-        }
-
+            return this.indexKeys.map(k => entryMap.get(k));
+        });
     }
 
     /**
-     * Sets the index id for a record
-     * @param idxValues - tuple of index values for a given record/row
-     * @param idxId - numeric index id to be stored for that record
+     * Sets the index ids for multiple rows of data
+     * @param indexedProps — an iterable of tuples corresponding, each containing the indexed
+     *  properties of a record
+     * @param initValue — callback that returns the value to be stored; will be called for 
+     *  elements that do not already exist
      */
-    set(idxValues: any[], idxId: number) {
+    initAll(indexedProps: Iterable<Sendable[]>, initValue: () => V) {
+        for (const item of indexedProps) {
+            this.init(item, initValue);
+        }
+    }
+
+    /**
+     * Adds an element for an indexed record if it does not already exist.
+     * @param idxValues — tuple of index values for a given record
+     * @param initValue — callback that returns the value to be stored; will only be called if an
+     *  element does not already exist for the indexed record
+     */
+    init(idxValues: any[], initValue: () => V) {
         // Stringify objects in the key. This may not be the ideal way to compare by value, but 
         // it's easy, predictable, and relatively efficient.
         idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
 
         // Store row number
-        this.map.set(idxValues, idxId);
+        this.map.init(idxValues, initValue);
     }
 
     /**
-     * Gets the index id for a record
-     * @param idxValues - tuple of index values for a given record/row
-     * @returns numeric index id stored for that record
+     * Adds an element for an indexed record if it does not already exist, otherwise updates the 
+     * existing element.
+     * @param idxValues — tuple of index values for a given record
+     * @param value — the value to be associated with that record
      */
-    get(idxValues: any[]): number | undefined {
+    set(idxValues: any[], value: V) {
+        // Stringify objects in the key. This may not be the ideal way to compare by value, but 
+        // it's easy, predictable, and relatively efficient.
+        idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
+
+        // Store row number
+        this.map.set(idxValues, value);
+    }
+
+    /**
+     * Gets the element associated with an indexed record
+     * @param idxValues — tuple of index values for a given record
+     * @returns — element associated with that record, if any, otherwise `undefined`
+     */
+    get(idxValues: any[]): V | undefined {
         idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
         return this.map.get(idxValues);
     }
@@ -102,7 +139,7 @@ export function getIndexKeys(ctor: Constructor, context?: { readonly [k: string]
 type TupleMapNode<T> = { value?: T, next: Map<any, TupleMapNode<T>> };
 
 /**
- * TupleMap - map that uses variable-length tuples as keys
+ * TupleMap — map that uses variable-length tuples as keys
  * 
  * This class will probably become obsolete if/when the Records & Tuples Proposal reaches stage 4
  * (see https://github.com/tc39/proposal-record-tuple).
@@ -110,6 +147,41 @@ type TupleMapNode<T> = { value?: T, next: Map<any, TupleMapNode<T>> };
 export class TupleMap<T = any> {
     map = new Map<any, TupleMapNode<T>>();
 
+    /**
+     * Adds a new element with a specified key to the Map if an element with the same does not 
+     * already exist.
+     * @param key 
+     * @param init — callback that returns the value to be stored; will only be called if an 
+     *  element with the specified key does not already exist
+     * @returns the value (newly initialized or already existing)
+     */
+    init(key: any[], init: () => T): T {
+        let map = this.map;
+        for (let i = 0; i < key.length - 1; i++) {
+            const item = key[i];
+            if (!map.has(item)) {
+                map.set(item, { next: new Map() });
+            }
+            map = map.get(item)!.next;
+        }
+        const last = key.at(-1);
+        if (!map.has(last)) {
+            const value = init();
+            map.set(last, { value: value, next: new Map() });
+            return value;
+        } else {
+            const node = map.get(last)!;
+            if ('value' in node) return node.value!;
+            return node.value = init();
+        }
+    }
+
+    /**
+     * Adds a new element with a specified key and value to the Map. If an element with the same 
+     * key already exists, the element will be updated.
+     * @param key 
+     * @param value 
+     */
     set(key: any[], value: T) {
         let map = this.map;
         for (let i = 0; i < key.length - 1; i++) {
@@ -127,6 +199,11 @@ export class TupleMap<T = any> {
         }
     }
 
+    /**
+     * Returns a specified element from the map.
+     * @param key
+     * @returns — the element associated with the specified key, if any, or undefined
+     */
     get(key: any[]): T | undefined {
         let map = this.map;
         for (let i = 0; i < key.length - 1; i++) {

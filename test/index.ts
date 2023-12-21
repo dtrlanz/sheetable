@@ -216,19 +216,17 @@ test('index set & get', async t => {
     t.is(index0.get([123]), 100);
     t.is(index0.get([123, 456]), 200);
     t.is(index0.get([123, 456, 789]), 300);
-    index0.setRows(data.rows, data.colNumbers);
+    let id = 0;
+    index0.initAll(index0.getIndexedProps(data.rows, data.colNumbers), () => id++);
     const idxValues0 = [2, 12, 22, 32, 42, 52, 62];
     for (let i = 0; i < idxValues0.length; i++) {
         t.is(index0.get([idxValues0[i]]), i);
     }
-    index0.setRows(data.rows, data.colNumbers, 10);
-    for (let i = 0; i < idxValues0.length; i++) {
-        t.is(index0.get([idxValues0[i]]), i + 10);
-    }
 
     const header1 = Header.open(Test, headers, { complex: true });
     const index1 = new Index(Test, header1, { complex: true });
-    index1.setRows(data.rows, data.colNumbers);
+    id = 0;
+    index1.initAll(index1.getIndexedProps(data.rows, data.colNumbers), () => id++);
     const idxValues1 = [
         [2, 7, 9],
         [12, 17, 19], 
@@ -244,7 +242,8 @@ test('index set & get', async t => {
 
     const header2 = Header.open(Test, headers, { withObj: true });
     const index2 = new Index(Test, header2, { withObj: true });
-    index2.setRows(data.rows, data.colNumbers);
+    id = 0;
+    index2.initAll(index2.getIndexedProps(data.rows, data.colNumbers), () => id++);
     const idxValues2 = [
         [2, { c1: 3, c2: { c21: 4, c22: 5, c23: 6 } }],
         [12, { c1: 13, c2: { c21: 14, c22: 15, c23: 16 } }],
