@@ -3,7 +3,7 @@
       /* Visit https://aka.ms/tsconfig to read more about this file */
       /* Language and Environment */
       "target": "ES2022",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-      "lib": ["es2022", "esnext.decorators"],
+      "lib": ["es2022", "esnext.decorators", "dom"],
       "experimentalDecorators": false,
       /* Modules */
       "rootDir": ".",                                  /* Specify the root folder within your source files. */
