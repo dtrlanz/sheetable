@@ -6,19 +6,15 @@
       "lib": ["es2022", "esnext.decorators", "dom"],
       "experimentalDecorators": false,
       /* Modules */
-      "rootDir": ".",                                  /* Specify the root folder within your source files. */
-      "moduleResolution":"node",
+      "rootDir": ".",                                      /* Specify the root folder within your source files. */
+      "moduleResolution": "node",
       /* Emit */
-      "outDir": "./dist",                                  /* Specify an output folder for all emitted files. */
+      "outDir": "./out/node",                              /* Specify an output folder for all emitted files. */
       /* Interop Constraints */
       "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
       "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
-
-      "jsx": "preserve",
-  
       /* Type Checking */
       "strict": true,                                      /* Enable all strict type-checking options. */
-  
       /* Completeness */
       "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
     }

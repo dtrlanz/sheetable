@@ -1,7 +1,7 @@
 import { build } from "@dtrlanz/gas-bundler";
 
 build({
-    entryPoints: ['src/index.ts'],
-    outdir: 'out',
+    entryPoints: ['test/clasp/server.ts', 'test/clasp/client.html'],
+    outdir: 'out/clasp',
     format: 'cjs',
 });
