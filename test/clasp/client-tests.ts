@@ -1,3 +1,7 @@
-export function message(value: any) {
-    return `The value is ${value}. Have a nice day!`;
-}
+import { test } from "./test";
+
+test('my test', t => {
+    t.is(4, 4);
+    t.assert(true);
+    t.is(5, 5);
+});

@@ -4,13 +4,12 @@
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
 </head>
 <body>
-    <h1>Hello, world</h1>
+    <h1>Client-side tests</h1>
     <p id="msg"></p>
     <script type="module">
         const url = '<?= spreadsheet.url ?>';
 
-        import { message } from "./client-tests.ts";
-        document.getElementById('msg').innerText = message(url);
+        import "./client-tests.ts";
     </script>
 </body>
 </html>
