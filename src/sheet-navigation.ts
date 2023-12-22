@@ -126,16 +126,31 @@ export class Region {
                 this.rowStop - this.rowStart, this.colStop - this.colStart)
                 .getValues();
         } else {
-            const data = this.sheet.getRange(this.colStart, this.rowStart, 
+            return transpose(this.sheet.getRange(this.colStart, this.rowStart, 
                 this.colStop - this.colStart, this.rowStop - this.rowStart)
-                .getValues();
-            const transposed = [];
-            for (let i = 0; i < this.rowStop - this.rowStart; i++) {
-                transposed.push(data.map(col => col[i]));
-            }
-            return transposed;
+                .getValues());
         }
     }
+
+    writeAll(data: any[][]) {
+        if (this.orientation === 'normal') {
+            this.sheet.getRange(this.rowStart, this.colStart, 
+                this.rowStop - this.rowStart, this.colStop - this.colStart)
+                .setValues(data);
+        } else {
+            this.sheet.getRange(this.colStart, this.rowStart, 
+                this.colStop - this.colStart, this.rowStop - this.rowStart)
+                .setValues(transpose(data));
+        }
+    }
+}
+
+function transpose(data: any[][]): any[][] {
+    const transposed = [];
+    for (let i = 0; i < data.length; i++) {
+        transposed.push(data.map(col => col[i]));
+    }
+    return transposed;
 }
 
 export class TableWalker {

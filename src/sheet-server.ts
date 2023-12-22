@@ -125,6 +125,11 @@ type SheetRequest = {
         index: number, 
         count?: number
     },
+    setData?: {
+        colNumbers?: number[],
+        rowStart: number,
+        rows: Sendable[][],
+    },
 };
 
 type SheetResponse = {
@@ -136,6 +141,7 @@ type SheetResponse = {
     },
     insertedRows?: boolean,
     insertedColumns?: boolean,
+    setData?: boolean,
 };
 
 export class SheetServer {
@@ -146,9 +152,17 @@ export class SheetServer {
     }
 
     request(req: SheetRequest): SheetResponse {
+        // *** Structural changes (row/column deletion & insertion) ***
+        // Handle row/column deletions first.
+        
+        /* not yet implemented */
+
+        // Handle row/column insertions second.
+        let insertedRows = false, insertedColumns = false;
+        // Since we're operating directly on a `SheetLike` and not going through a `Region`, we
+        // have to account for sheet orientation manually.
         const insertRows = req.orientation === 'normal' ? req.insertRows : req.insertColumns;
         const insertColumns = req.orientation === 'normal' ? req.insertColumns : req.insertRows;
-        let insertedRows = false, insertedColumns = false;
         if (insertRows) {
             this.sheet.insertRows(insertRows.index, insertRows.count);
             insertedRows = true;
@@ -158,10 +172,61 @@ export class SheetServer {
             insertedColumns = true;
         }
 
+        // *** Writing & reading data ***
         const region = Region
             .fromSheet(this.sheet, req.orientation)
             .crop(req.limit?.rowStart, req.limit?.rowStop, 
                 req.limit?.colStart, req.limit?.colStop);
+
+        // Write before reading.
+        let setData = false;
+        if (req.setData) {
+            const colNumbers = 
+                // ensure column numbers are within region
+                req.setData.colNumbers?.filter(v => v >= region.colStart && v < region.colStop)
+                // default to all columns in the given range
+                ?? intRange(region.colStart, region.colStop);
+
+            if (colNumbers.length !== 0) {
+                const colRange = isRange(colNumbers);
+                if (colRange) {
+                    // Optimize for contiguous columns (probably more common).
+                    const writeRegion = region.crop(
+                        req.setData.rowStart, req.setData.rowStart + req.setData.rows.length, 
+                        colRange.start, colRange.stop
+                    );
+                    writeRegion.writeAll(req.setData.rows);
+                } else {
+                    // Pick out non-contiguous columns.
+
+                    // The following implementation is perhaps not the most elegant but I'm 
+                    // guessing it would be reasonably efficient. Another, possibly better
+                    // option would be to write each column (or even each set of contiguous
+                    // columns) in turn. But there's no point implementing that before I have
+                    // a system in place to benchmark it.
+
+                    // 1. read existing data
+                    const min = colNumbers.reduce((a, b) => a < b ? a : b);
+                    const max = colNumbers.reduce((a, b) => a > b ? a : b);
+                    const writeRegion = region.crop(req.setData.rowStart, 
+                        req.setData.rowStart + req.setData.rows.length, min, max + 1);
+                    const data = writeRegion.readAll();
+                    // 2. overwrite with new data
+                    for (let i = 0; i < data.length; i++) {
+                        for (let j = 0; j < colNumbers.length; j++) {
+                            data[i][colNumbers[j] - min] = req.setData.rows[i][j];
+                        }
+                    }
+                    // 3. write data back to sheet
+                    writeRegion.writeAll(data);
+                }
+                setData = true;
+            }
+        }
+
+        // Read data last.
+        // A request would not usually include both read & write instructions. But if it does, 
+        // data returned should reflect the latest changes.
         
         // Need to find headers if:
         // - requester asked for headers OR
@@ -235,7 +300,7 @@ export class SheetServer {
             }
         }
 
-        return { headers, data };
+        return { headers, data, insertedColumns, insertedRows, setData };
     }
 }
 
