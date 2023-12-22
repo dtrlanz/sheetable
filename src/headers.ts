@@ -127,92 +127,6 @@ export class Header<T> {
     }
 }
 
-export interface HeaderLabels {
-    [K: string]: string | string[];
-}
-
-export interface HeaderNode {
-    readonly colStart: number;
-    readonly colStop: number;
-    readonly row: number;
-    readonly children: HeaderChild[];
-    ignore?: boolean;
-}
-
-export interface HeaderChild extends HeaderNode {
-    readonly parent: HeaderNode;
-    readonly key: string | [string, number];
-    readonly label: string;
-}
-
-export function writeHeaders(headers: HeaderNode, region: Region) {
-    if ('label' in headers) {
-        region.write(headers.row, headers.colStart, headers.label);
-    }
-    for (const c of headers.children) writeHeaders(c, region);
-}
-
-export function createHeaders(
-    obj: MetaTagged,
-    colStart: number,
-    row: number,
-): HeaderNode {
-    const children: (Omit<HeaderChild, 'parent'>)[] = [];
-    let col = colStart;
-    for (const k in obj) {
-        const v = obj[k];
-        if (Array.isArray(v)) {
-            for (let i = 0; i < v.length; i++) {
-                const label = obj[Sheetable.META]?.props.get(k)?.label?.[i] ?? `${k}[${i}]`;
-                if (label === null) continue;
-                const subHeaders = {
-                    ...createHeaders(v[i], col, row + 1),
-                    row: row,
-                    key: [k, i] as [string, number],
-                    label: label,
-                };
-                children.push(subHeaders);
-                col = subHeaders.colStop;
-            }
-        } else {
-            const label = obj[Sheetable.META]?.props.get(k)?.label ?? k;
-            if (label === null) continue;
-            if (Array.isArray(label)) throw Error('array not expected');
-            if (typeof v === 'object' && !('toScalar' in v) && !(v instanceof Date)) {
-                const subHeaders = {
-                    ...createHeaders(v, col, row + 1),
-                    row: row,
-                    key: k,
-                    label: label,
-                };
-                children.push(subHeaders);
-                col = subHeaders.colStop;
-            } else {
-                children.push({
-                    colStart: col,
-                    colStop: col + 1,
-                    row: row,
-                    children: [],
-                    key: k,
-                    label: label,
-                });
-                col++;
-            }
-        }
-    }
-    const root = {
-        colStart: colStart,
-        colStop: col,
-        row: row,
-        children: [] as HeaderChild[],
-    };
-    root.children = children.map(child => ({
-        ...child,
-        parent: root,
-    }));
-    return root;
-}
-
 export interface Branch {
     label: any;
     row: number;
@@ -270,28 +184,6 @@ export function findBranches(walker: TableWalker): BranchResult | null {
         minRowStop: minRowStop,
         maxRowStop: maxRowStop,
     };
-}
-
-export function getHeaders(walker: TableWalker, obj: MetaTagged): HeaderNode | undefined {
-    const { branches, rowStop } = getHeadersHelper(walker);
-    return Sheetable.getHeaderTree(obj, branches, rowStop, 'stop');
-}
-
-export function getHeadersForClient(walker: TableWalker): Branch[] {
-    const { branches, rowStop } = getHeadersHelper(walker);
-    trimBranches(branches, rowStop);
-    return branches;
-
-    function trimBranches(branches: Branch[], rowStop: number) {
-        // assume children at the same level will always be in the same row
-        if (branches[0]?.row >= rowStop) {
-            branches.length = 0;
-            return;
-        }
-        for (const c of branches) {
-            trimBranches(c.children, rowStop);
-        }
-    }
 }
 
 export function getHeadersHelper(walker: TableWalker): { branches: Branch[], rowStop: number } {

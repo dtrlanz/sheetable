@@ -2,7 +2,7 @@
 // `url` is a string containing the url of the spreadsheet to which the project is bound
 import { url } from "./_url";
 
-globalThis.doGet = doGet;
+(globalThis as any).doGet = doGet;
 function doGet() {
     const client = HtmlService.createTemplateFromFile('client');
     client.spreadsheet = {

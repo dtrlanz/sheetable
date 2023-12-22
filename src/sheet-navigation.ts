@@ -164,7 +164,7 @@ export class TableWalker {
         this.col = col ?? region.colStart;
     }
 
-    static fromSheet(sheet: Sheet, orientation: Orientation = 'normal'): TableWalker {
+    static fromSheet(sheet: SheetLike, orientation: Orientation = 'normal'): TableWalker {
         return new TableWalker(Region.fromSheet(sheet, orientation));
     }
 
