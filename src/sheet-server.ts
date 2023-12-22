@@ -181,11 +181,11 @@ export class SheetServer {
         // Write before reading.
         let setData = false;
         if (req.setData) {
-            const colNumbers = 
+            const colNumbers = (req.setData.colNumbers ??
+                // default to all columns in the given range (or as much as there is data)
+                intRange(region.colStart, region.colStart + (req.setData.rows[0]?.length ?? 0)))
                 // ensure column numbers are within region
-                req.setData.colNumbers?.filter(v => v >= region.colStart && v < region.colStop)
-                // default to all columns in the given range
-                ?? intRange(region.colStart, region.colStop);
+                .filter(v => v >= region.colStart && v < region.colStop);
 
             if (colNumbers.length !== 0) {
                 const colRange = isRange(colNumbers);
@@ -195,6 +195,18 @@ export class SheetServer {
                         req.setData.rowStart, req.setData.rowStart + req.setData.rows.length, 
                         colRange.start, colRange.stop
                     );
+                    // ensure rows fit within region
+                    if (req.setData.rowStart < writeRegion.rowStart) {
+                        req.setData.rows.splice(0, writeRegion.rowStart - req.setData.rowStart);
+                    }
+                    if (req.setData.rows.length > writeRegion.rowStop - writeRegion.rowStart) {
+                        req.setData.rows.length = writeRegion.rowStop - writeRegion.rowStart;
+                    }
+                    // ensure columns fit within region
+                    for (const row of req.setData.rows) {
+                        row.length = colNumbers.length;
+                    }
+                    // write data
                     writeRegion.writeAll(req.setData.rows);
                 } else {
                     // Pick out non-contiguous columns.

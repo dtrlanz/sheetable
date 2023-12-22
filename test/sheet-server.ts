@@ -438,14 +438,34 @@ test('write data', t => {
 
     t.deepEqual(testValues(), expected);
 
-    // without supplying column numbers (requires data size to match)
-    t.throws(() => server.request({ orientation: 'normal', setData: {
+    // without supplying column numbers; too little data to fill row -> ok
+    server.request({ orientation: 'normal', setData: {
         rowStart: 4,
-        rows: [[100, 101, 102, 103, 104, 105, 106, 107, 108, 109]],
-    }}));
+        rows: [[500, 501, 502, 503]],
+    }});
+    expected[3] = [500, 501, 502, 503, 4, 5, 6, 7, 8, 9, ''];
+    t.deepEqual(testValues(), expected);
+
+    // without supplying column numbers; too much data -> truncated
+    server.request({ orientation: 'normal', setData: {
+        rowStart: 4,
+        rows: [[300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313]],
+    }});
+    expected[3] = [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310];
+    t.deepEqual(testValues(), expected);
+
+    // without supplying column numbers; data width matches row width -> ok
     server.request({ orientation: 'normal', setData: {
         rowStart: 4,
         rows: [[100, 101, 102, 103, 104, 105, 106, 107, 108, 109, '']],
+    }});
+    expected[3] = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, ''];
+    t.deepEqual(testValues(), expected);
+
+    // without supplying column numbers; no data -> ok, no effect
+    server.request({ orientation: 'normal', setData: {
+        rowStart: 4,
+        rows: [[]],
     }});
     expected[3] = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, ''];
     t.deepEqual(testValues(), expected);
@@ -512,7 +532,7 @@ test('write data', t => {
         ],
     }});
     expected[8] = [410, 611, 612, 413, 414, 615, 416, 617, 0, 1, 2];
-    expected[9] = [ 60,  64,  62,  63,  64,  65,  66,  67, 5, 6, 7];
+    expected[9] = [ 60,  61,  62,  63,  64,  65,  66,  67, 5, 6, 7];
     t.deepEqual(testValues(), expected);
 
     // values outside of the given region are ignored (non-contiguous columns)
