@@ -467,4 +467,66 @@ test('write data', t => {
     }});
     expected[5] = [20, 301, 302, 23, 24, 305, 26, 307, 308, 309, ''];
     t.deepEqual(testValues(), expected);
+
+    // multiple rows, with supplying column numbers
+    server.request({ orientation: 'normal', setData: {
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        rowStart: 7,
+        rows: [
+            [210, 211, 212, 213, 214, 215, 216, 217, 218, 219],
+            [310, 311, 312, 313, 314, 315, 316, 317, 318, 319],
+            [410, 411, 412, 413, 414, 415, 416, 417, 418, 419],
+        ],
+    }});
+    expected[6] = [210, 211, 212, 213, 214, 215, 216, 217, 218, 219, ''];
+    expected[7] = [310, 311, 312, 313, 314, 315, 316, 317, 318, 319, ''];
+    expected[8] = [410, 411, 412, 413, 414, 415, 416, 417, 418, 419, ''];
+    t.deepEqual(testValues(), expected);
+
+    // multiple rows, non-contiguous column numbers
+    server.request({ orientation: 'normal', setData: {
+        colNumbers: [2, 3, 6, 10, 8, 9],
+        rowStart: 6,
+        rows: [
+            [311, 312, 315, 319, 317, 318],
+            [411, 412, 415, 419, 417, 418],
+            [511, 512, 515, 519, 517, 518],
+            [611, 612, 615, 619, 617, 618],
+        ],
+    }});
+    expected[5] = [ 20, 311, 312,  23,  24, 315,  26, 317, 318, 319, ''];
+    expected[6] = [210, 411, 412, 213, 214, 415, 216, 417, 418, 419, ''];
+    expected[7] = [310, 511, 512, 313, 314, 515, 316, 517, 518, 519, ''];
+    expected[8] = [410, 611, 612, 413, 414, 615, 416, 617, 618, 619, ''];
+    t.deepEqual(testValues(), expected);
+    
+    // values outside of the given region are ignored (contiguous columns)
+    server.request({ orientation: 'normal', setData: {
+        colNumbers: [9, 10, 11, 12, 13],
+        rowStart: 9,
+        rows: [
+            [0, 1, 2, 3, 4],
+            [5, 6, 7, 8, 9],
+            [10, 11, 12, 13, 14],
+            [15, 16, 17, 18, 19],
+        ],
+    }});
+    expected[8] = [410, 611, 612, 413, 414, 615, 416, 617, 0, 1, 2];
+    expected[9] = [ 60,  64,  62,  63,  64,  65,  66,  67, 5, 6, 7];
+    t.deepEqual(testValues(), expected);
+
+    // values outside of the given region are ignored (non-contiguous columns)
+    server.request({ orientation: 'normal', setData: {
+        colNumbers: [9, 11, 13],
+        rowStart: 9,
+        rows: [
+            [30, 32, 34],
+            [35, 37, 39],
+            [40, 42, 44],
+            [45, 47, 49],
+        ],
+    }});
+    expected[8] = [410, 611, 612, 413, 414, 615, 416, 617, 30, 1, 32];
+    expected[9] = [ 60,  61,  62,  63,  64,  65,  66,  67, 35, 6, 37];
+    t.deepEqual(testValues(), expected);
 });
