@@ -117,6 +117,14 @@ type SheetRequest = {
         rowStart?: number,
         rowStop?: number,
     },
+    insertRows?: {
+        index: number, 
+        count?: number
+    },
+    insertColumns?: {
+        index: number, 
+        count?: number
+    },
 };
 
 type SheetResponse = {
@@ -126,6 +134,8 @@ type SheetResponse = {
         colNumbers: number[],
         rowOffset: number,
     },
+    insertedRows?: boolean,
+    insertedColumns?: boolean,
 };
 
 export class SheetServer {
@@ -136,8 +146,20 @@ export class SheetServer {
     }
 
     request(req: SheetRequest): SheetResponse {
+        const insertRows = req.orientation === 'normal' ? req.insertRows : req.insertColumns;
+        const insertColumns = req.orientation === 'normal' ? req.insertColumns : req.insertRows;
+        let insertedRows = false, insertedColumns = false;
+        if (insertRows) {
+            this.sheet.insertRows(insertRows.index, insertRows.count);
+            insertedRows = true;
+        }
+        if (insertColumns) {
+            this.sheet.insertColumns(insertColumns.index, insertColumns.count);
+            insertedColumns = true;
+        }
+
         const region = Region
-            .fromSheet(this.sheet)
+            .fromSheet(this.sheet, req.orientation)
             .crop(req.limit?.rowStart, req.limit?.rowStop, 
                 req.limit?.colStart, req.limit?.colStop);
         
@@ -239,44 +261,66 @@ export class SheetClient {
     readonly url?: string;
     readonly sheetName?: string;
     readonly orientation: Orientation;
-    range: {
-        rowStart?: number,
-        rowStop?: number,
-        colStart?: number,
-        colStop?: number,
-    } = {};
     private readonly request: (req: SheetRequest) => Promise<SheetResponse>;
+    #rowStart: number;
+    #rowStop: number;
+    #colStart: number;
+    #colStop: number;
+    get rowStart() { return this.#rowStart; }
+    get rowStop() { return this.#rowStop; }
+    get colStart() { return this.#colStart; }
+    get colStop() { return this.#colStop; }
 
-    constructor(
+    private constructor(
         url: string | undefined, 
         sheetName: string | undefined, 
         orientation: Orientation, 
-        request: (req: SheetRequest) => Promise<SheetResponse>
+        request: (req: SheetRequest) => Promise<SheetResponse>,
+        rowStart: number,
+        rowStop: number,
+        colStart: number,
+        colStop: number,
     ) {
         this.url = url;
         this.sheetName = sheetName;
         this.orientation = orientation;
         this.request = request;
+        this.#rowStart = rowStart;
+        this.#rowStop = rowStop;
+        this.#colStart = colStart;
+        this.#colStop = colStop;
     }
 
     static async fromUrl(url?: string, sheetName?: string, orientation: Orientation = 'normal'): Promise<SheetClient> {
         throw new Error('SheetClient.fromUrl() not yet implemented');
     }
 
-    static fromSheet(sheet: SheetLike, sheetName?: string, orientation: Orientation = 'normal'): SheetClient {
+    static fromSheet(
+        sheet: SheetLike, 
+        sheetName?: string, 
+        orientation: Orientation = 'normal',
+        rowStart?: number,
+        rowStop?: number,
+        colStart?: number,
+        colStop?: number,
+    ): SheetClient {
         const server = new SheetServer(sheet);
         return new SheetClient(
             undefined,
             sheetName,
             orientation,
-            req => Promise.resolve(server.request(req))
+            req => Promise.resolve(server.request(req)),
+            rowStart ?? 1,
+            rowStop ?? sheet.getLastRow() + 1,
+            colStart ?? 1,
+            colStop ?? sheet.getLastColumn() + 1,
         );
     }
 
     async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SheetResponse['data'] }> {
         return this.request({
             orientation: this.orientation,
-            limit: this.range,
+            limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             getHeaders: true,   // thus result.headers !== undefined (i.e., type cast below is ok)
             getData: 
                 columns == 'all' ? true : 
@@ -288,10 +332,30 @@ export class SheetClient {
     async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Sendable[][], colNumbers: number[], rowOffset: number }> {
         const { data } = await this.request({
             orientation: this.orientation,
-            limit: this.range,
+            limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             getHeaders: false,
             getData: { rowStart, rowStop },
         });
         return data!;
+    }
+
+    async insertRows(rowIndex: number, numRows?: number): Promise<void> {
+        await this.request({
+            orientation: this.orientation,
+            insertRows: {
+                index: rowIndex,
+                count: numRows,
+            },
+        });
+    }
+
+    async insertColumns(columnIndex: number, numColumns?: number): Promise<void> {
+        await this.request({
+            orientation: this.orientation,
+            insertRows: {
+                index: columnIndex,
+                count: numColumns,
+            },
+        });
     }
 }
