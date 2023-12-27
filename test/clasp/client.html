@@ -4,12 +4,13 @@
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
 </head>
 <body>
-    <h1>Client-side tests</h1>
-    <p id="msg"></p>
+    <h1>Tests</h1>
+    <div id="tests"></div>
     <script type="module">
         const url = '<?= spreadsheet.url ?>';
 
-        import "./client-tests.ts";
+        import { display } from "./client-tests.ts";
+        display(document.getElementById('tests'));
     </script>
 </body>
 </html>

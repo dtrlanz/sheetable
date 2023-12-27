@@ -1,6 +1,7 @@
 // Make sure to add this module to the same directory
 // `url` is a string containing the url of the spreadsheet to which the project is bound
 import { url } from "./_url";
+import "./server-fns";
 
 (globalThis as any).doGet = doGet;
 function doGet() {
