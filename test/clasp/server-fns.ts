@@ -1,4 +1,4 @@
-import { ServerFunctions } from "./test";
+import { ServerFunctions } from "./server-proxy";
 
 export interface SF extends ServerFunctions {
     add(lhs: number, rhs: number): number;
