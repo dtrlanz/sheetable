@@ -39,9 +39,16 @@ export function test(name: string, fn: (t: ExecutionContext) => void | Promise<v
             output.innerHTML = `<h1>${name}</h1>
                 <div class="result"></div>
                 <div class="values"></div>
+                <div class="options"><a href="#">run again</a></div>
                 <div class="stack"></div>`;
             output.getElementsByTagName('h1')[0]
                 .addEventListener('click', () => output?.classList.toggle('collapsed'));
+            const rerun = output.getElementsByTagName('a')[0] as HTMLAnchorElement;
+            rerun.addEventListener('click', () => {
+                output!.getElementsByClassName('values')[0].innerHTML = '';
+                output!.getElementsByClassName('stack')[0].innerHTML = '';
+                run();
+            });
             div.appendChild(output);
         }
         if (!output) return;
@@ -52,30 +59,35 @@ export function test(name: string, fn: (t: ExecutionContext) => void | Promise<v
     }
 }
 
-
 class ExecutionContext {
     values = {};
 
     assert(actual: any, message?: string) {
         if (actual) return;
         this.values = { value: actual };
-        throw new Error(message ?? 'Assertion failed');
+        message ??= 'Assertion failed';
+        console.error(message);
+        throw new Error(message);
     }
 
     is(actual: any, expected: any, message?: string) {
         if (actual === expected) return;
         this.values = { actual, expected };
-        throw new Error(message ?? 'Equality assertion failed');
+        message ??= 'Equality assertion failed';
+        console.error(message);
+        throw new Error(message);
     }
 
     deepEqual(actual: any, expected:any, message?: string) {
         const log: { method: string, args: any[] }[] = [];
         if (diff(undefined, actual, expected, log)) return;
+        message ??= 'Deep equality assertion failed';
+        console.error(message);
         for (const line of log) {
             (console as any)[line.method](...line.args);
         }
         this.values = { actual, expected };
-        throw new Error(message ?? 'Deep equality assertion failed');
+        throw new Error(message);
     }
 }
 
