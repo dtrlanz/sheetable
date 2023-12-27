@@ -4,23 +4,14 @@ import { server as _server, TypedServer } from "./server-proxy";
 
 const server = _server as TypedServer<SF>;
 
-test('passing test', t => {
-    t.is(4, 4);
-    t.assert(true);
-    t.is(5, 5);
+test('deep equal pass', t => {
+    const a = { foo: 25, bar: ['x', 'y', 'z'], baz: { q: true, r: false } };
+    const b = { ...a, bar: ['x', 'y', 'z'] };
+    t.deepEqual(a, b);
 });
 
-test('failing test', t => {
-    t.assert(0);
+test('deep equal fail', t => {
+    const a = { foo: 25, bar: ['x', 'y', 'z'], baz: { q: true, r: false } };
+    const b = { ...a, bar: ['x', 'y', 'c'] };
+    t.deepEqual(a, b);
 });
-
-test('passing async test', async t => {
-    const r = await server.add(1, 2);
-    t.is(r, 3);
-});
-
-test('failing async test', async t => {
-    const r = await server.subtract(1, 2);
-    t.is(r, 42);
-});
-
