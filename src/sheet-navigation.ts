@@ -5,8 +5,10 @@ export interface SheetLike {
     getLastRow(): number;
     getName(): string;
     getRange(row: number, column: number, numRows?: number, numColumns?: number): RangeLike;
-    insertColumns(columnIndex: number, numColumns?: number): void;
-    insertRows(rowIndex: number, numRows?: number): void;
+    insertColumns(columnPosition: number, numColumns?: number): void;
+    insertRows(rowPosition: number, numRows?: number): void;
+    deleteColumns(columnPosition: number, numColumns?: number): void;
+    deleteRows(rowPosition: number, numRows?: number): void;
     setName(name: string): void;
 }
 

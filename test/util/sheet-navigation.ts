@@ -38,14 +38,24 @@ export class TestSheet implements SheetLike {
         return new TestRange(this, row, column, numRows, numColumns);
     }
 
-    insertColumns(columnIndex: number, numColumns?: number) {
+    insertColumns(columnPosition: number, numColumns: number = 1) {
         this._rows.forEach(row => {
-            if (row) row.splice(columnIndex - 1, 0, ...new Array(numColumns));
+            if (row) row.splice(columnPosition - 1, 0, ...new Array(numColumns));
         });
     }
 
-    insertRows(rowIndex: number, numRows?: number) {
-        this._rows.splice(rowIndex - 1, 0, ...new Array(numRows));
+    insertRows(rowPosition: number, numRows: number = 1) {
+        this._rows.splice(rowPosition - 1, 0, ...new Array(numRows));
+    }
+
+    deleteColumns(columnPosition: number, numColumns: number = 1) {
+        this._rows.forEach(row => {
+            if (row) row.splice(columnPosition - 1, numColumns);
+        });
+    }
+
+    deleteRows(rowPosition: number, numRows: number = 1) {
+        this._rows.splice(rowPosition - 1, numRows);
     }
 
     setName(name: string) {

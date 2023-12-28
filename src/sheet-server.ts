@@ -30,11 +30,19 @@ type SpreadsheetRequest = {
         rowStop?: number,
     },
     insertRows?: {
-        index: number, 
+        position: number, 
         count?: number
     },
     insertColumns?: {
-        index: number, 
+        position: number, 
+        count?: number
+    },
+    deleteRows?: {
+        position: number, 
+        count?: number
+    },
+    deleteColumns?: {
+        position: number, 
         count?: number
     },
     setData?: {
@@ -83,6 +91,8 @@ type SpreadsheetResponse = {
     },
     insertedRows?: boolean,
     insertedColumns?: boolean,
+    deletedRows?: boolean,
+    deletedColumns?: boolean,
     setData?: boolean,
 };
 
@@ -111,6 +121,8 @@ export class SpreadsheetServer {
         let insertedSheet: SpreadsheetResponse['insertedSheet'];
         let insertedRows: SpreadsheetResponse['insertedRows'];
         let insertedColumns: SpreadsheetResponse['insertedColumns'];
+        let deletedRows: SpreadsheetResponse['insertedRows'];
+        let deletedColumns: SpreadsheetResponse['insertedColumns'];
         let headers: SpreadsheetResponse['headers'];
         let data: SpreadsheetResponse['data'];
         let setData: SpreadsheetResponse['setData'];
@@ -204,21 +216,31 @@ export class SpreadsheetServer {
         if (!sheet) return getResponse();
 
         // *** Structural changes (row/column deletion & insertion) ***
-        // Handle row/column deletions first.
-        
-        /* not yet implemented */
 
-        // Handle row/column insertions second.
         // Since we're operating directly on a `SheetLike` and not going through a `Region`, we
         // have to account for sheet orientation manually.
+
+        // Handle row/column deletions first.
+        const deleteRows = req.orientation === 'normal' ? req.deleteRows : req.deleteColumns;
+        const deleteColumns = req.orientation === 'normal' ? req.deleteColumns : req.deleteRows;
+        if (deleteRows) {
+            sheet.deleteRows(deleteRows.position, deleteRows.count);
+            deletedRows = true;
+        }
+        if (deleteColumns) {
+            sheet.deleteColumns(deleteColumns.position, deleteColumns.count);
+            deletedColumns = true;
+        }
+
+        // Handle row/column insertions second.
         const insertRows = req.orientation === 'normal' ? req.insertRows : req.insertColumns;
         const insertColumns = req.orientation === 'normal' ? req.insertColumns : req.insertRows;
         if (insertRows) {
-            sheet.insertRows(insertRows.index, insertRows.count);
+            sheet.insertRows(insertRows.position, insertRows.count);
             insertedRows = true;
         }
         if (insertColumns) {
-            sheet.insertColumns(insertColumns.index, insertColumns.count);
+            sheet.insertColumns(insertColumns.position, insertColumns.count);
             insertedColumns = true;
         }
 
@@ -384,6 +406,8 @@ export class SpreadsheetServer {
                 data, 
                 insertedColumns, 
                 insertedRows, 
+                deletedRows,
+                deletedColumns,
                 setData,
             };
         }
@@ -490,21 +514,41 @@ export class SheetClient {
         return data!;
     }
 
-    async insertRows(rowIndex: number, numRows?: number): Promise<void> {
+    async insertRows(rowPosition: number, numRows?: number): Promise<void> {
         await this.request({
             orientation: this.orientation,
             insertRows: {
-                index: rowIndex,
+                position: rowPosition,
                 count: numRows,
             },
         });
     }
 
-    async insertColumns(columnIndex: number, numColumns?: number): Promise<void> {
+    async insertColumns(columnPosition: number, numColumns?: number): Promise<void> {
         await this.request({
             orientation: this.orientation,
             insertColumns: {
-                index: columnIndex,
+                position: columnPosition,
+                count: numColumns,
+            },
+        });
+    }
+
+    async deleteRows(rowPosition: number, numRows?: number): Promise<void> {
+        await this.request({
+            orientation: this.orientation,
+            deleteRows: {
+                position: rowPosition,
+                count: numRows,
+            },
+        });
+    }
+
+    async deleteColumns(columnPosition: number, numColumns?: number): Promise<void> {
+        await this.request({
+            orientation: this.orientation,
+            deleteColumns: {
+                position: columnPosition,
                 count: numColumns,
             },
         });

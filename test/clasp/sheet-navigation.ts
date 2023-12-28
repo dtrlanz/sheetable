@@ -54,12 +54,20 @@ class ServerSheet {
         }
     }
 
-    insertColumns(columnIndex: number, numColumns?: number): Promise<void> {
-        return server.insertColumns(this._name, columnIndex, numColumns);
+    insertColumns(columnPosition: number, numColumns?: number): Promise<void> {
+        return server.insertColumns(this._name, columnPosition, numColumns);
     }
 
-    async insertRows(rowIndex: number, numRows?: number): Promise<void> {
-        return server.insertRows(this._name, rowIndex, numRows);
+    insertRows(rowPosition: number, numRows?: number): Promise<void> {
+        return server.insertRows(this._name, rowPosition, numRows);
+    }
+
+    deleteColumns(columnPosition: number, numColumns?: number) {
+        return server.deleteColumns(this._name, columnPosition, numColumns);
+    }
+
+    deleteRows(rowPosition: number, numRows?: number) {
+        return server.deleteRows(this._name, rowPosition, numRows);
     }
 }
 
@@ -189,6 +197,98 @@ test('insert rows & columns', async t => {
 
     t.is(await sSheet.getLastRow(), 0, 'unexpected value from server');
     t.is(tSheet.getLastRow(), 0, 'unexpected value from TestSheet');
+
+    // add marker value
+    await sSheet.getRange(3, 5).setValue(true);
+    tSheet.getRange(3, 5).setValue(true);
+
+    // insert row
+    await sSheet.insertRows(3);
+    tSheet.insertRows(3);
+
+    t.is(await sSheet.getRange(4, 5).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(4, 5).getValue(), true, 'unexpected value from TestSheet');
+
+    // insert column
+    await sSheet.insertColumns(5);
+    tSheet.insertColumns(5);
+
+    t.is(await sSheet.getRange(4, 6).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(4, 6).getValue(), true, 'unexpected value from TestSheet');
+
+    // insert rows
+    await sSheet.insertRows(3, 5);
+    tSheet.insertRows(3, 5);
+
+    t.is(await sSheet.getRange(9, 6).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(9, 6).getValue(), true, 'unexpected value from TestSheet');
+
+    // insert columns
+    await sSheet.insertColumns(3, 5);
+    tSheet.insertColumns(3, 5);
+
+    t.is(await sSheet.getRange(9, 11).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(9, 11).getValue(), true, 'unexpected value from TestSheet');
+
+    await sSheet.delete();
+});;
+
+test('delete rows & columns', async t => {
+    const tSheet = new TestSheet([]);
+    const sSheet = await ServerSheet.create();
+
+    // delete row
+    await sSheet.deleteRows(1);
+    tSheet.deleteRows(1);
+
+    t.is(await sSheet.getLastRow(), 0, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 0, 'unexpected value from TestSheet');
+
+    // delete column
+    await sSheet.deleteColumns(1);
+    tSheet.deleteColumns(1);
+
+    t.is(await sSheet.getLastRow(), 0, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 0, 'unexpected value from TestSheet');
+
+    // add marker value
+    await sSheet.getRange(10, 8).setValue(true);
+    tSheet.getRange(10, 8).setValue(true);
+
+    // delete row
+    await sSheet.deleteRows(3);
+    tSheet.deleteRows(3);
+
+    t.is(await sSheet.getRange(9, 8).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(9, 8).getValue(), true, 'unexpected value from TestSheet');
+
+    // delete column
+    await sSheet.deleteColumns(3);
+    tSheet.deleteColumns(3);
+
+    t.is(await sSheet.getRange(9, 7).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(9, 7).getValue(), true, 'unexpected value from TestSheet');
+
+    // delete rows
+    await sSheet.deleteRows(3, 5);
+    tSheet.deleteRows(3, 5);
+
+    t.is(await sSheet.getRange(4, 7).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(4, 7).getValue(), true, 'unexpected value from TestSheet');
+
+    // delete columns
+    await sSheet.deleteColumns(3, 2);
+    tSheet.deleteColumns(3, 2);
+
+    t.is(await sSheet.getRange(4, 5).getValue(), true, 'unexpected value from server');
+    t.is(tSheet.getRange(4, 5).getValue(), true, 'unexpected value from TestSheet');
+
+    // delete rows
+    await sSheet.deleteRows(4);
+    tSheet.deleteRows(4);
+
+    t.is(await sSheet.getRange(4, 7).getValue(), '', 'unexpected value from server');
+    t.is(tSheet.getRange(4, 7).getValue(), '', 'unexpected value from TestSheet');
 
     await sSheet.delete();
 });;

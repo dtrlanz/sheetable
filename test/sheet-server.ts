@@ -368,12 +368,12 @@ test('insert rows', async t => {
 
     const expected = sample.getRange(1, 1, sample.getLastRow(), sample.getLastColumn()).getValues();
 
-    function insert(index: number, count: number = 1) {
+    function insert(position: number, count: number = 1) {
         const newRows = [];
         for (let i = 0; i < count; i++) {
             newRows.push(repeat('', 10));
         }
-        expected.splice(index - 1, 0, ...newRows);
+        expected.splice(position - 1, 0, ...newRows);
     }
 
     t.deepEqual(testValues(), expected);
@@ -404,9 +404,9 @@ test('insert columns', async t => {
 
     const expected = sample.getRange(1, 1, sample.getLastRow(), sample.getLastColumn()).getValues();
 
-    function insert(index: number, count: number = 1) {
+    function insert(position: number, count: number = 1) {
         for (const row of expected) {
-            row.splice(index - 1, 0, ...repeat('', count));
+            row.splice(position - 1, 0, ...repeat('', count));
         }
     }
 
@@ -425,6 +425,72 @@ test('insert columns', async t => {
 
     await client.insertColumns(10, 10);
     insert(10, 10);
+    t.deepEqual(testValues(), expected);
+});
+
+test('delete rows', async t => {
+    const testSheet = getSampleSheet();
+    const client = SheetClient.fromSheet(testSheet);
+
+    function testValues() {
+        return testSheet.getRange(1, 1, testSheet.getLastRow(), testSheet.getLastColumn()).getValues();
+    }
+
+    const expected = sample.getRange(1, 1, sample.getLastRow(), sample.getLastColumn()).getValues();
+
+    function del(position: number, count: number = 1) {
+        expected.splice(position - 1, count);
+    }
+
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteRows(8);
+    del(8);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteRows(1, 3);
+    del(1, 3);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteRows(5, 0);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteRows(5, 10);
+    del(5, 10);
+    t.deepEqual(testValues(), expected);
+});
+
+test('delete columns', async t => {
+    const testSheet = getSampleSheet();
+    const client = SheetClient.fromSheet(testSheet);
+
+    function testValues() {
+        return testSheet.getRange(1, 1, testSheet.getLastRow(), testSheet.getLastColumn()).getValues();
+    }
+
+    const expected = sample.getRange(1, 1, sample.getLastRow(), sample.getLastColumn()).getValues();
+
+    function del(position: number, count: number = 1) {
+        for (const row of expected) {
+            row.splice(position - 1, count);
+        }
+    }
+
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteColumns(8);
+    del(8);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteColumns(1, 3);
+    del(1, 3);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteColumns(5, 0);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteColumns(5, 10);
+    del(5, 10);
     t.deepEqual(testValues(), expected);
 });
 

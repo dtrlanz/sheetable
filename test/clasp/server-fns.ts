@@ -87,17 +87,31 @@ function setRangeValues(sheetName: string, row: number, column: number, numRows:
 }
 
 (globalThis as any).insertColumns = insertColumns;
-function insertColumns(sheetName: string, columnIndex: number, numColumns?: number) {
+function insertColumns(sheetName: string, columnPosition: number, numColumns?: number) {
     const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
     if (!sheet) throw new Error(`sheet ${sheetName} not found`);
-    sheet.insertColumns(columnIndex, numColumns ?? 1);
+    sheet.insertColumns(columnPosition, numColumns ?? 1);
 }
 
 (globalThis as any).insertRows = insertRows;
-function insertRows(sheetName: string, rowIndex: number, numRows?: number) {
+function insertRows(sheetName: string, rowPosition: number, numRows?: number) {
     const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
     if (!sheet) throw new Error(`sheet ${sheetName} not found`);
-    sheet.insertRows(rowIndex, numRows ?? 1);
+    sheet.insertRows(rowPosition, numRows ?? 1);
+}
+
+(globalThis as any).deleteColumns = deleteColumns;
+function deleteColumns(sheetName: string, columnPosition: number, numColumns?: number) {
+    const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
+    if (!sheet) throw new Error(`sheet ${sheetName} not found`);
+    sheet.deleteColumns(columnPosition, numColumns ?? 1);
+}
+
+(globalThis as any).deleteRows = deleteRows;
+function deleteRows(sheetName: string, rowPosition: number, numRows?: number) {
+    const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
+    if (!sheet) throw new Error(`sheet ${sheetName} not found`);
+    sheet.deleteRows(rowPosition, numRows ?? 1);
 }
 
 // Server functions for testing data types
