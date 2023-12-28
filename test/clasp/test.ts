@@ -96,18 +96,18 @@ function diff(key: string | number | undefined, actual: any, expected: any, log:
         if (actual === expected) {
             log.push({
                 method: 'log',
-                args: [key !== undefined ? `${key}: ${String(actual)}` : String(actual)],
+                args: [key !== undefined ? `${key}: ${toStr(actual)}` : toStr(actual)],
             });
             return true;
         };
         let str = '';
         let styles = [];
         if (actual !== undefined) {
-            str = (key !== undefined ? `%c${key}: ${String(actual)}` : `%c${String(actual)}`) + '\n';
+            str = (key !== undefined ? `%c${key}: ${toStr(actual)}` : `%c${toStr(actual)}`) + '\n';
             styles.push('color: red;');
         }
         if (expected !== undefined) {
-            str += key !== undefined ? `%c${key}: ${String(expected)}` : `%c${String(expected)}`;
+            str += key !== undefined ? `%c${key}: ${toStr(expected)}` : `%c${toStr(expected)}`;
             styles.push('color: green;');
         }
         log.push({ method: 'log', args: [str.trimEnd(), ...styles] });
@@ -140,4 +140,12 @@ function diff(key: string | number | undefined, actual: any, expected: any, log:
     });
     log.push({ method: 'groupEnd', args: [] });
     return equal;
+
+    function toStr(value: any): string {
+        if (typeof value === 'string') {
+            return `"${value}"`;
+        } else {
+            return String(value);
+        }
+    }
 }

@@ -4,22 +4,12 @@ import { server as _server, TypedServer } from "./server-proxy";
 
 const server = _server as TypedServer<SF>;
 
-test('passing test', t => {
-    t.is(4, 4);
-    t.assert(true);
-    t.is(5, 5);
-});
+test('write different types to sheet', async t => {
+    const values = await server.testWritingTypes();
 
-test('failing test', t => {
-    t.assert(0);
-});
-
-test('passing async test', async t => {
-    const r = await server.add(1, 2);
-    t.is(r, 3);
-});
-
-test('failing async test', async t => {
-    const r = await server.subtract(1, 2);
-    t.is(r, 42);
+    t.deepEqual(values, [
+        // original values were:
+        // true, null, undefined, 53, 9007199254740991n,  'abc', Symbol(my symbol), {}
+        [  true, '',   '',        53, "9007199254740991", 'abc', '',                '{}']
+    ]);
 });
