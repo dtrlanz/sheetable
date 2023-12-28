@@ -146,7 +146,7 @@ test('tagged templates', t => {
     t.deepEqual(strings, [['a', 'b', 'c'], ['a a', 'b b', 'c c'], ['a', '', '']]);
 
     const empty = sheet``.getRange(1, 1, 3, 3).getValues();
-    t.deepEqual(empty, [['']]);
+    t.deepEqual(empty, [['', '', ''], ['', '', ''], ['', '', '']]);
 
     const misc = sheet`
         a | 4 | -3.14
