@@ -21,8 +21,8 @@ export class TestSheet implements SheetLike {
         return this._name;
     }
 
-    getRange(row: number, colunn: number, numRows?: number, numColumns?: number): RangeLike {
-        return new TestRange(this, row, colunn, numRows, numColumns);
+    getRange(row: number, column: number, numRows?: number, numColumns?: number): RangeLike {
+        return new TestRange(this, row, column, numRows, numColumns);
     }
 
     insertColumns(columnIndex: number, numColumns?: number) {
@@ -41,29 +41,39 @@ export class TestSheet implements SheetLike {
 export class TestRange implements RangeLike {
     sheet: TestSheet;
     row: number;
-    colunn: number;
+    column: number;
     numRows: number;
     numColumns: number;
 
     constructor(sheet: TestSheet, row: number, colunn: number, numRows?: number, numColumns?: number) {
         this.sheet = sheet;
         this.row = row;
-        this.colunn = colunn;
+        this.column = colunn;
         this.numRows = numRows ?? 1;
         this.numColumns = numColumns ?? 1;
     }
 
     getValue(): any {
-        return this.sheet._rows[this.row - 1][this.colunn - 1];
+        return this.sheet._rows[this.row - 1]?.[this.column - 1] ?? '';
     }
 
     getValues(): any[][] {
+        const arr = [];
+        for (let rIdx = 0; rIdx < this.numColumns; rIdx++) {
+            const row = []
+            for (let cIdx = 0; cIdx < this.numColumns; cIdx++) {
+                row.push(this.sheet._rows[rIdx + this.row]?.[cIdx + this.column] ?? '');
+            }
+            arr.push(row);
+        }
+        return arr;
         return this.sheet._rows.slice(this.row - 1, this.row - 1 + this.numRows)
-            .map(row => row.slice(this.colunn - 1, this.colunn - 1 + this.numColumns));
+            .map(row => row.slice(this.column - 1, this.column - 1 + this.numColumns)
+                .map(cell => cell ?? ''));
     }
 
     setValue(value: number | string | boolean | Date): void {
-        this.sheet._rows[this.row - 1][this.colunn - 1] = value;
+        this.sheet._rows[this.row - 1][this.column - 1] = value;
     }
 
     setValues(values: (number | string | boolean | Date)[][]): void {
@@ -77,7 +87,7 @@ export class TestRange implements RangeLike {
         }
 
         for (let i = 0; i < values.length; i++) {
-            this.sheet._rows[this.row - 1 + i].splice(this.colunn - 1, this.numColumns, ...values[i]);
+            this.sheet._rows[this.row - 1 + i].splice(this.column - 1, this.numColumns, ...values[i]);
         }
     }
 }
