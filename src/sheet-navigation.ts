@@ -3,9 +3,11 @@ export type Orientation = 'normal' | 'transposed';
 export interface SheetLike {
     getLastColumn(): number;
     getLastRow(): number;
+    getName(): string;
     getRange(row: number, column: number, numRows?: number, numColumns?: number): RangeLike;
     insertColumns(columnIndex: number, numColumns?: number): void;
     insertRows(rowIndex: number, numRows?: number): void;
+    setName(name: string): void;
 }
 
 export interface RangeLike {

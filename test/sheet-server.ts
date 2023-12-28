@@ -1,7 +1,7 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
 
-import { SheetClient, SheetServer } from "../src/sheet-server.js";
+import { SheetClient, SpreadsheetServer } from "../src/sheet-server.js";
 import { Branch } from '../src/headers.js';
 import { Sendable } from '../src/values.js';
 
@@ -21,7 +21,7 @@ function getSampleSheet() {
 }
 
 const sample = getSampleSheet();
-const server = new SheetServer(sample);
+const server = new SpreadsheetServer(sample);
 
 const expectedHeaders = [
     br('A', 1, 1, 3,
@@ -46,7 +46,7 @@ function br(label: string, row: number, start: number, stop: number, ...children
 }
 
 test('get headers', t => {
-    const { headers } = server.request({
+    const { headers } = server.do({
         orientation: 'normal',
         getHeaders: true
     });
@@ -54,7 +54,7 @@ test('get headers', t => {
 });
 
 test('get all data (incl. header rows)', t => {
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: true
     });
@@ -64,7 +64,7 @@ test('get all data (incl. header rows)', t => {
     t.deepEqual(data0?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 11).getValues());
 
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: {
             colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -76,7 +76,7 @@ test('get all data (incl. header rows)', t => {
     t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     t.deepEqual(data1?.rows, sample.getRange(1, 1, 10, 11).getValues());
 
-    const { data: data2, headers: headers2 } = server.request({
+    const { data: data2, headers: headers2 } = server.do({
         orientation: 'normal',
         getData: {
             colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -91,7 +91,7 @@ test('get all data (incl. header rows)', t => {
 });
 
 test('get all data (excl. header rows)', t => {
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getHeaders: true,
         getData: true,
@@ -102,7 +102,7 @@ test('get all data (excl. header rows)', t => {
     t.deepEqual(data0?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     t.deepEqual(data0?.rows, sample.getRange(4, 1, 7, 10).getValues());
 
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getHeaders: true,
         getData: {
@@ -115,7 +115,7 @@ test('get all data (excl. header rows)', t => {
     t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 10).getValues());
 
-    const { data: data2, headers: headers2 } = server.request({
+    const { data: data2, headers: headers2 } = server.do({
         orientation: 'normal',
         getData: {
             colHeaders: ['A', 'B', 'C', 'D', 'E', 'F'],
@@ -129,7 +129,7 @@ test('get all data (excl. header rows)', t => {
 });
 
 test('select contiguous columns', t => {
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: {
             colNumbers: [1, 2, 3],
@@ -141,7 +141,7 @@ test('select contiguous columns', t => {
     t.deepEqual(data0?.colNumbers, [1, 2, 3]);
     t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 3).getValues());
 
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: {
             colNumbers: [2, 3, 4, 5, 6, 7, 8, 9],
@@ -153,7 +153,7 @@ test('select contiguous columns', t => {
     t.deepEqual(data1?.colNumbers, [2, 3, 4, 5, 6, 7, 8, 9]);
     t.deepEqual(data1?.rows, sample.getRange(1, 2, 10, 8).getValues());
 
-    const { data: data2, headers: headers2 } = server.request({
+    const { data: data2, headers: headers2 } = server.do({
         orientation: 'normal',
         getData: {
             colNumbers: [7, 8, 9, 10, 11],
@@ -168,7 +168,7 @@ test('select contiguous columns', t => {
 
 test('reorder contiguous columns', t => {
     let colNumbers = [3, 2, 1];
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -180,7 +180,7 @@ test('reorder contiguous columns', t => {
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [4, 5, 6, 2, 3, 7, 8, 9];
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -192,7 +192,7 @@ test('reorder contiguous columns', t => {
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [11, 7, 8, 9, 10];
-    const { data: data2, headers: headers2 } = server.request({
+    const { data: data2, headers: headers2 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -207,7 +207,7 @@ test('reorder contiguous columns', t => {
 
 test('repeat contiguous columns', t => {
     let colNumbers = [3, 2, 1, 2, 1];
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -219,7 +219,7 @@ test('repeat contiguous columns', t => {
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [7, 8, 9, 10, 11, 7, 8, 9, 10, 11];
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -233,7 +233,7 @@ test('repeat contiguous columns', t => {
 
 test('select non-contiguous columns', t => {
     let colNumbers = [1, 4, 7];
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -245,7 +245,7 @@ test('select non-contiguous columns', t => {
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [1, 4, 5, 6, 9, 10];
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: { colNumbers },
     });
@@ -259,7 +259,7 @@ test('select non-contiguous columns', t => {
 
 test('select contiguous headers', t => {
     let colNumbers = [1, 2, 3];
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: {
             colHeaders: ['A', 'B'],
@@ -273,7 +273,7 @@ test('select contiguous headers', t => {
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [4, 5, 6, 7];
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: {
             colHeaders: ['C'],
@@ -288,7 +288,7 @@ test('select contiguous headers', t => {
 
 test('select non-contiguous headers', t => {
     let colNumbers = [1, 2, 4, 5, 6, 7];
-    const { data: data0, headers: headers0 } = server.request({
+    const { data: data0, headers: headers0 } = server.do({
         orientation: 'normal',
         getData: {
             colHeaders: ['A', 'C'],
@@ -302,7 +302,7 @@ test('select non-contiguous headers', t => {
         .map(row => colNumbers.map(n => row[n - 1])));
 
     colNumbers = [8, 10];
-    const { data: data1, headers: headers1 } = server.request({
+    const { data: data1, headers: headers1 } = server.do({
         orientation: 'normal',
         getData: {
             colHeaders: ['D', 'F'],
@@ -430,7 +430,7 @@ test.skip('insert columns', async t => {
 
 test('write data', t => {
     const testSheet = getSampleSheet();
-    const server = new SheetServer(testSheet);
+    const server = new SpreadsheetServer(testSheet);
     function testValues() {
         return testSheet.getRange(1, 1, testSheet.getLastRow(), testSheet.getLastColumn()).getValues();
     }
@@ -439,7 +439,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // without supplying column numbers; too little data to fill row -> ok
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         rowStart: 4,
         rows: [[500, 501, 502, 503]],
     }});
@@ -447,7 +447,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // without supplying column numbers; too much data -> truncated
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         rowStart: 4,
         rows: [[300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313]],
     }});
@@ -455,7 +455,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // without supplying column numbers; data width matches row width -> ok
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         rowStart: 4,
         rows: [[100, 101, 102, 103, 104, 105, 106, 107, 108, 109, '']],
     }});
@@ -463,7 +463,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // without supplying column numbers; no data -> ok, no effect
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         rowStart: 4,
         rows: [[]],
     }});
@@ -471,7 +471,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // with supplying column numbers
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         rowStart: 7,
         rows: [[200, 201, 202, 203, 204, 205, 206, 207, 208, 209]],
@@ -480,7 +480,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // non-contiguous column numbers
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         colNumbers: [2, 3, 6, 10, 8, 9],
         rowStart: 6,
         rows: [[301, 302, 305, 309, 307, 308]],
@@ -489,7 +489,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // multiple rows, with supplying column numbers
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         rowStart: 7,
         rows: [
@@ -504,7 +504,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // multiple rows, non-contiguous column numbers
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         colNumbers: [2, 3, 6, 10, 8, 9],
         rowStart: 6,
         rows: [
@@ -521,7 +521,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
     
     // values outside of the given region are ignored (contiguous columns)
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         colNumbers: [9, 10, 11, 12, 13],
         rowStart: 9,
         rows: [
@@ -536,7 +536,7 @@ test('write data', t => {
     t.deepEqual(testValues(), expected);
 
     // values outside of the given region are ignored (non-contiguous columns)
-    server.request({ orientation: 'normal', setData: {
+    server.do({ orientation: 'normal', setData: {
         colNumbers: [9, 11, 13],
         rowStart: 9,
         rows: [

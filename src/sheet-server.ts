@@ -2,8 +2,20 @@ import { SheetLike, Orientation, Region, TableWalker } from "./sheet-navigation.
 import { Branch, getHeadersHelper } from "./headers.js";
 import { Sendable, toSendable } from "./values.js";
 
-type SheetRequest = {
-    orientation: Orientation,
+type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
+
+type SpreadsheetRequest = {
+    spreadsheetUrl?: string,
+    spreadsheetId?: string,
+    listSheets?: boolean,
+    insertSheet?: boolean | {
+        index?: number,
+    },
+    sheetId?: number,
+    sheetName?: string,
+    deleteSheet?: boolean,
+    renameSheet?: string,
+    orientation?: Orientation,
     limit?: {
         rowStart?: number,
         rowStop?: number,
@@ -32,7 +44,37 @@ type SheetRequest = {
     },
 };
 
-type SheetResponse = {
+type SpreadsheetResponse = {
+    spreadsheet?: {
+        url: string,
+        id: string,
+        name: string,
+        sheets?: {
+            id: number,
+            name: string,
+        }[],
+    },
+    deletedSheet?: {
+        id: number,
+        index: number,
+        name: string,
+    },
+    renamedSheet?: {
+        id: number,
+        index: number,
+        oldName: string,
+        newName: string,
+    },
+    insertedSheet?: {
+        id: number,
+        index: number,
+        name: string,
+    },
+    sheet?: {
+        id: number,
+        index: number,
+        name: string,
+    },
     headers?: Branch[],
     data?: {
         rows: Sendable[][],
@@ -44,42 +86,150 @@ type SheetResponse = {
     setData?: boolean,
 };
 
-export class SheetServer {
-    sheet: SheetLike;
+export class SpreadsheetServer {
+    readonly spreadsheet?: GoogleAppsScript.Spreadsheet.Spreadsheet;
+    readonly sheet?: SheetLike;
 
-    constructor(sheet: SheetLike) {
-        this.sheet = sheet;
+    constructor();
+    constructor(spreadsheet: Spreadsheet);
+    constructor(sheet: SheetLike);
+    constructor(obj?: Spreadsheet | SheetLike) {
+        if (obj && 'getSheets' in obj) {
+            this.spreadsheet = obj;
+        } else {
+            this.sheet = obj;
+        }
+        this.do = this.do.bind(this);
     }
 
-    request(req: SheetRequest): SheetResponse {
+    do(req: SpreadsheetRequest): SpreadsheetResponse {
+        let spreadsheet: Spreadsheet;
+        let sheet: SheetLike | undefined;
+        let sheetList: { id: number, name: string }[] | undefined;
+        let deletedSheet: SpreadsheetResponse['deletedSheet'];
+        let renamedSheet: SpreadsheetResponse['renamedSheet'];
+        let insertedSheet: SpreadsheetResponse['insertedSheet'];
+        let insertedRows: SpreadsheetResponse['insertedRows'];
+        let insertedColumns: SpreadsheetResponse['insertedColumns'];
+        let headers: SpreadsheetResponse['headers'];
+        let data: SpreadsheetResponse['data'];
+        let setData: SpreadsheetResponse['setData'];
+    
+        /****************************/
+        /*  Spreadsheet operations  */
+        /****************************/
+
+        // If a sheet was provided at construction, this instance is restricted to operations
+        // within that sheet. So ignore any requests pertaining to the parent spreadsheet.
+        if (!this.sheet) {
+            // If no spreadsheet was provided at construction, open the one with the id/url provided.
+            // If none, try using the active spreadsheet.
+            spreadsheet = this.spreadsheet
+                ?? (req.spreadsheetId ? SpreadsheetApp.openById(req.spreadsheetId)
+                : req.spreadsheetUrl ? SpreadsheetApp.openByUrl(req.spreadsheetUrl)
+                : SpreadsheetApp.getActiveSpreadsheet());
+            if (!spreadsheet) return {};
+
+            // Retrieve sheet by id or by name, or default to using active sheet (if any).
+            if (req.sheetId != undefined) {
+                for (const s of spreadsheet.getSheets()) {
+                    if (s.getSheetId() === req.sheetId) {
+                        sheet = s;
+                        break;
+                    }
+                }
+            } else if (req.sheetName != undefined) {
+                sheet = spreadsheet.getSheetByName(req.sheetName) ?? undefined;
+            } else {
+                sheet = SpreadsheetApp.getActiveSheet();
+            }
+
+            // ** Spreadsheet operations requiring a specific existing sheet **
+            if (sheet) {
+                // You can either rename a sheet or delete it, not both in the same request.
+                // Rename sheet
+                if (req.renameSheet) {
+                    renamedSheet = {
+                        id: (sheet as GoogleAppsScript.Spreadsheet.Sheet).getSheetId(),
+                        index: (sheet as GoogleAppsScript.Spreadsheet.Sheet).getIndex(),
+                        oldName: sheet.getName(),
+                        newName: req.renameSheet,
+                    };
+                    sheet.setName(req.renameSheet);
+                // Delete sheet
+                } else if (req.deleteSheet) {
+                    deletedSheet = {
+                        id: (sheet as GoogleAppsScript.Spreadsheet.Sheet).getSheetId(),
+                        index: (sheet as GoogleAppsScript.Spreadsheet.Sheet).getIndex(),
+                        name: sheet.getName(),
+                    };
+                    spreadsheet.deleteSheet(sheet as GoogleAppsScript.Spreadsheet.Sheet);
+                    sheet = undefined;
+                }
+            }
+            
+            // ** Spreadsheet operations not requiring a specific existing sheet **
+            // Insert sheet
+            if (req.insertSheet) {
+                const index: any = typeof req.insertSheet === 'object' ? req.insertSheet.index 
+                    : undefined;
+                if (req.sheetName) {
+                    sheet = spreadsheet.insertSheet(req.sheetName, index);
+                } else {
+                    sheet = spreadsheet.insertSheet(index);
+                }
+                insertedSheet = {
+                    id: (sheet as GoogleAppsScript.Spreadsheet.Sheet).getSheetId(),
+                    index: (sheet as GoogleAppsScript.Spreadsheet.Sheet).getIndex(),
+                    name: sheet.getName(),
+                };
+            }
+            
+            // Get sheet list
+            if (req.listSheets) {
+                sheetList = spreadsheet.getSheets().map(s => ({
+                    id: s.getSheetId(),
+                    name: s.getSheetName(),
+                }));
+            }
+        }
+
+        /**********************/
+        /*  Sheet operations  */
+        /**********************/
+
+        // If a sheet was just inserted or renamed, keep using that.
+        // If a sheet was provided at construction, use that.
+        sheet ??= this.sheet;
+        if (!sheet) return getResponse();
+
         // *** Structural changes (row/column deletion & insertion) ***
         // Handle row/column deletions first.
         
         /* not yet implemented */
 
         // Handle row/column insertions second.
-        let insertedRows = false, insertedColumns = false;
         // Since we're operating directly on a `SheetLike` and not going through a `Region`, we
         // have to account for sheet orientation manually.
         const insertRows = req.orientation === 'normal' ? req.insertRows : req.insertColumns;
         const insertColumns = req.orientation === 'normal' ? req.insertColumns : req.insertRows;
         if (insertRows) {
-            this.sheet.insertRows(insertRows.index, insertRows.count);
+            sheet.insertRows(insertRows.index, insertRows.count);
             insertedRows = true;
         }
         if (insertColumns) {
-            this.sheet.insertColumns(insertColumns.index, insertColumns.count);
+            sheet.insertColumns(insertColumns.index, insertColumns.count);
             insertedColumns = true;
         }
 
         // *** Writing & reading data ***
         const region = Region
-            .fromSheet(this.sheet, req.orientation)
+            .fromSheet(sheet, req.orientation)
             .crop(req.limit?.rowStart, req.limit?.rowStop, 
                 req.limit?.colStart, req.limit?.colStop);
 
         // Write before reading.
-        let setData = false;
+        setData = false;
         if (req.setData) {
             const colNumbers = (req.setData.colNumbers ??
                 // default to all columns in the given range (or as much as there is data)
@@ -146,7 +296,7 @@ export class SheetServer {
         const headersNeeded = req.getHeaders || typeof req.getData === 'object' 
             && req.getData.colHeaders && !req.getData.colNumbers;
 
-        let headers: SheetResponse['headers'];
+        
         let dataRegion = region;
         if (headersNeeded) {
             const { branches, rowStop } = getHeadersHelper(new TableWalker(region));
@@ -158,7 +308,6 @@ export class SheetServer {
         }
 
         // Retrieve requested columns
-        let data: SheetResponse['data'];
         if (req.getData) {
             if (typeof req.getData === 'object') {
                 dataRegion = dataRegion.crop(req.getData.rowStart, req.getData.rowStop);
@@ -212,7 +361,32 @@ export class SheetServer {
             }
         }
 
-        return { headers, data, insertedColumns, insertedRows, setData };
+        return getResponse();
+
+        function getResponse(): SpreadsheetResponse {
+            const sheetInfo = sheet ? {
+                id: (sheet as any).getSheetId?.() ?? 0,
+                index: (sheet as any).getIndex?.() ?? 0,
+                name: sheet.getName(),
+            }: undefined;
+            return {
+                spreadsheet: spreadsheet ? {
+                    id: spreadsheet.getId(),
+                    url: spreadsheet.getUrl(),
+                    name: spreadsheet.getName(),
+                    sheets: sheetList,
+                } : undefined,
+                deletedSheet, 
+                renamedSheet, 
+                insertedSheet,
+                sheet: sheetInfo,
+                headers, 
+                data, 
+                insertedColumns, 
+                insertedRows, 
+                setData,
+            };
+        }
     }
 }
 
@@ -238,7 +412,7 @@ export class SheetClient {
     readonly url?: string;
     readonly sheetName?: string;
     readonly orientation: Orientation;
-    private readonly request: (req: SheetRequest) => Promise<SheetResponse>;
+    private readonly request: (req: SpreadsheetRequest) => Promise<SpreadsheetResponse>;
     #rowStart: number;
     #rowStop: number;
     #colStart: number;
@@ -252,7 +426,7 @@ export class SheetClient {
         url: string | undefined, 
         sheetName: string | undefined, 
         orientation: Orientation, 
-        request: (req: SheetRequest) => Promise<SheetResponse>,
+        request: (req: SpreadsheetRequest) => Promise<SpreadsheetResponse>,
         rowStart: number,
         rowStop: number,
         colStart: number,
@@ -281,12 +455,12 @@ export class SheetClient {
         colStart?: number,
         colStop?: number,
     ): SheetClient {
-        const server = new SheetServer(sheet);
+        const server = new SpreadsheetServer(sheet);
         return new SheetClient(
             undefined,
             sheetName,
             orientation,
-            req => Promise.resolve(server.request(req)),
+            req => Promise.resolve(server.do(req)),
             rowStart ?? 1,
             rowStop ?? sheet.getLastRow() + 1,
             colStart ?? 1,
@@ -294,7 +468,7 @@ export class SheetClient {
         );
     }
 
-    async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SheetResponse['data'] }> {
+    async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }> {
         return this.request({
             orientation: this.orientation,
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
@@ -303,7 +477,7 @@ export class SheetClient {
                 columns == 'all' ? true : 
                 columns == 'none' ? false :
                 { colHeaders: columns },
-        }) as Promise<{ headers: Branch[], data: SheetResponse['data'] }>; 
+        }) as Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }>; 
     }
 
     async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Sendable[][], colNumbers: number[], rowOffset: number }> {

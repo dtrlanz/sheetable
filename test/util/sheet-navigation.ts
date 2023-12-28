@@ -2,9 +2,11 @@ import { SheetLike, RangeLike } from "../../src/sheet-navigation.js";
 
 export class TestSheet implements SheetLike {
     _rows: (number | string | boolean | Date)[][];
+    _name: string;
 
-    constructor(data: (number | string | boolean | Date)[][]) {
+    constructor(data: (number | string | boolean | Date)[][], name?: string) {
         this._rows = data;
+        this._name = name ?? 'TestSheet';
     }
 
     getLastColumn(): number {
@@ -13,6 +15,10 @@ export class TestSheet implements SheetLike {
 
     getLastRow(): number {
         return this._rows.length;
+    }
+
+    getName(): string {
+        return this._name;
     }
 
     getRange(row: number, colunn: number, numRows?: number, numColumns?: number): RangeLike {
@@ -25,6 +31,10 @@ export class TestSheet implements SheetLike {
 
     insertRows(rowIndex: number, numRows?: number) {
         throw new Error('TestSheet.insertRows() is not yet implemented');
+    }
+
+    setName(name: string) {
+        this._name = name;
     }
 }
 
