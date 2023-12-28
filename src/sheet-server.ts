@@ -221,8 +221,10 @@ export class SpreadsheetServer {
         // have to account for sheet orientation manually.
 
         // Handle row/column deletions first.
-        const deleteRows = req.orientation === 'normal' ? req.deleteRows : req.deleteColumns;
-        const deleteColumns = req.orientation === 'normal' ? req.deleteColumns : req.deleteRows;
+        let { deleteRows, deleteColumns } = req;
+        if (req.orientation === 'transposed') {
+            [deleteRows, deleteColumns] = [deleteColumns, deleteRows];
+        }
         if (deleteRows) {
             sheet.deleteRows(deleteRows.position, deleteRows.count);
             deletedRows = true;
@@ -231,10 +233,15 @@ export class SpreadsheetServer {
             sheet.deleteColumns(deleteColumns.position, deleteColumns.count);
             deletedColumns = true;
         }
+        if (req.orientation === 'transposed') {
+            [deletedRows, deletedColumns] = [deletedColumns, deletedRows];
+        }
 
         // Handle row/column insertions second.
-        const insertRows = req.orientation === 'normal' ? req.insertRows : req.insertColumns;
-        const insertColumns = req.orientation === 'normal' ? req.insertColumns : req.insertRows;
+        let { insertRows, insertColumns } = req;
+        if (req.orientation === 'transposed') {
+            [insertRows, insertColumns] = [insertColumns, insertRows];
+        }
         if (insertRows) {
             sheet.insertRows(insertRows.position, insertRows.count);
             insertedRows = true;
@@ -242,6 +249,9 @@ export class SpreadsheetServer {
         if (insertColumns) {
             sheet.insertColumns(insertColumns.position, insertColumns.count);
             insertedColumns = true;
+        }
+        if (req.orientation === 'transposed') {
+            [insertRows, insertColumns] = [insertColumns, insertRows];
         }
 
         // *** Writing & reading data ***

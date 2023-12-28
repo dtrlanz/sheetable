@@ -494,6 +494,59 @@ test('delete columns', async t => {
     t.deepEqual(testValues(), expected);
 });
 
+test('insert & delete with transposed orientation', async t => {
+    const testSheet = getSampleSheet();
+    const client = SheetClient.fromSheet(testSheet, undefined, 'transposed');
+
+    function testValues() {
+        return testSheet.getRange(1, 1, testSheet.getLastRow(), testSheet.getLastColumn()).getValues();
+    }
+
+    // transpose sample range
+    const expected = sample.getRange(1, 1, sample.getLastRow(), sample.getLastColumn()).getValues();
+
+    function insertRows(position: number, count: number = 1) {
+        for (const col of expected) {
+            col.splice(position - 1, 0, ...repeat('', count));
+        }
+    }
+
+    function insertColumns(position: number, count: number = 1) {
+        const numRows = expected[0].length;
+        const newCols = [];
+        for (let i = 0; i < count; i++) {
+            newCols.push(repeat('', numRows));
+        }
+        expected.splice(position - 1, 0, ...newCols);
+    }
+
+    function deleteRows(position: number, count: number = 1) {
+        for (const row of expected) {
+            row.splice(position - 1, count);
+        }
+    }
+
+    function deleteColumns(position: number, count: number = 1) {
+        expected.splice(position - 1, count);
+    }
+
+    await client.insertRows(4);
+    insertRows(4);
+    t.deepEqual(testValues(), expected);
+
+    await client.insertColumns(5);
+    insertColumns(5);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteRows(4);
+    deleteRows(4);
+    t.deepEqual(testValues(), expected);
+
+    await client.deleteColumns(5);
+    deleteColumns(5);
+    t.deepEqual(testValues(), expected);
+});
+
 function repeat<T>(value: T, count: number): T[] {
     const arr = [];
     for (let i = 0; i < count; i++) {
