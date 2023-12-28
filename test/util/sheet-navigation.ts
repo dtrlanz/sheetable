@@ -59,21 +59,22 @@ export class TestRange implements RangeLike {
 
     getValues(): any[][] {
         const arr = [];
-        for (let rIdx = 0; rIdx < this.numColumns; rIdx++) {
+        for (let rIdx = 0; rIdx < this.numRows; rIdx++) {
             const row = []
             for (let cIdx = 0; cIdx < this.numColumns; cIdx++) {
-                row.push(this.sheet._rows[rIdx + this.row]?.[cIdx + this.column] ?? '');
+                row.push(this.sheet._rows[rIdx + this.row - 1]?.[cIdx + this.column - 1] ?? '');
             }
             arr.push(row);
         }
         return arr;
-        return this.sheet._rows.slice(this.row - 1, this.row - 1 + this.numRows)
-            .map(row => row.slice(this.column - 1, this.column - 1 + this.numColumns)
-                .map(cell => cell ?? ''));
     }
 
     setValue(value: number | string | boolean | Date): void {
-        this.sheet._rows[this.row - 1][this.column - 1] = value;
+        let row = this.sheet._rows.at(this.row - 1);
+        if (!row) {
+            row = this.sheet._rows[this.row - 1] = [];
+        }
+        row[this.column - 1] = value;
     }
 
     setValues(values: (number | string | boolean | Date)[][]): void {
@@ -86,8 +87,12 @@ export class TestRange implements RangeLike {
             }
         }
 
-        for (let i = 0; i < values.length; i++) {
-            this.sheet._rows[this.row - 1 + i].splice(this.column - 1, this.numColumns, ...values[i]);
+        for (let rIdx = 0; rIdx < values.length; rIdx++) {
+            let row = this.sheet._rows[this.row - 1 + rIdx];
+            if (!row) {
+                row = this.sheet._rows[this.row - 1 + rIdx] = [];
+            }
+            row.splice(this.column - 1, this.numColumns, ...values[rIdx]);
         }
     }
 }

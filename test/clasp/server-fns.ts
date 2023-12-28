@@ -23,8 +23,10 @@ export interface SF extends ServerFunctions {
     deleteSheet(name: string): void;
     getLastColumn(sheetName: string): number;
     getLastRow(sheetName: string): number;
-    getValue(sheetName: string, row: number, column: number): any;
-    getValues(sheetName: string, row: number, column: number, numRows?: number, numColumns?: number): any[][];
+    getRangeValue(sheetName: string, row: number, column: number): any;
+    getRangeValues(sheetName: string, row: number, column: number, numRows?: number, numColumns?: number): any[][];
+    setRangeValue(sheetName: string, row: number, column: number, value: any): void;
+    setRangeValues(sheetName: string, row: number, column: number, numRows: number, numColumns: number, values: any[][]): void;
     insertColumns(sheetName: string, columnIndex: number, numColumns?: number): void;
     insertRows(sheetName: string, rowIndex: number, numRows?: number): void;
 }
@@ -56,18 +58,32 @@ export function getLastRow(sheetName: string): number {
     return sheet.getLastRow();
 }
 
-(globalThis as any).getValue = getValue;
-export function getValue(sheetName: string, row: number, column: number): any[][] {
+(globalThis as any).getRangeValue = getRangeValue;
+export function getRangeValue(sheetName: string, row: number, column: number): any[][] {
     const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
     if (!sheet) throw new Error(`sheet ${sheetName} not found`);
     return sheet.getRange(row, column).getValue();
 }
 
-(globalThis as any).getValues = getValues;
-export function getValues(sheetName: string, row: number, column: number, numRows?: number, numColumns?: number): any[][] {
+(globalThis as any).getRangeValues = getRangeValues;
+export function getRangeValues(sheetName: string, row: number, column: number, numRows?: number, numColumns?: number): any[][] {
     const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
     if (!sheet) throw new Error(`sheet ${sheetName} not found`);
     return sheet.getRange(row, column, numRows ?? 1, numColumns ?? 1).getValues();
+}
+
+(globalThis as any).setRangeValue = setRangeValue;
+export function setRangeValue(sheetName: string, row: number, column: number, value: any) {
+    const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
+    if (!sheet) throw new Error(`sheet ${sheetName} not found`);
+    sheet.getRange(row, column).setValue(value);
+}
+
+(globalThis as any).setRangeValues = setRangeValues;
+export function setRangeValues(sheetName: string, row: number, column: number, numRows: number, numColumns: number, values: any[][]) {
+    const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
+    if (!sheet) throw new Error(`sheet ${sheetName} not found`);
+    sheet.getRange(row, column, numRows ?? 1, numColumns ?? 1).setValues(values);
 }
 
 (globalThis as any).insertColumns = insertColumns;

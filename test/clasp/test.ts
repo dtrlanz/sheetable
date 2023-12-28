@@ -118,20 +118,20 @@ function diff(key: string | number | undefined, actual: any, expected: any, log:
     if (Array.isArray(actual)) {
         for (let i = 0; i < actual.length; i++) {
             // do not short-circuit recursion
-            equal = diff(i, actual[i], expected[i], log) && equal;
+            equal = diff(i, actual[i], expected?.[i], log) && equal;
         }
-        for (let i = actual.length; i < expected.length; i++) {
-            equal = diff(i, undefined, expected[i], log) && equal;
+        for (let i = actual.length; i < expected?.length; i++) {
+            equal = diff(i, undefined, expected?.[i], log) && equal;
         }
     } else {
         const actualKeys = new Set();
         for (const k in actual) {
             actualKeys.add(k);
-            equal = diff(k, actual[k], expected[k], log) && equal;
+            equal = diff(k, actual[k], expected?.[k], log) && equal;
         }
         for (const k in expected) {
             if (actualKeys.has(k)) continue;
-            equal = diff(k, undefined, expected[k], log) && equal;
+            equal = diff(k, undefined, expected?.[k], log) && equal;
         }    
     }
     log.splice(groupIdx, 0, { 

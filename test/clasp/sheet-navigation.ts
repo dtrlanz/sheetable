@@ -5,7 +5,6 @@ import { TestSheet } from "../util/sheet-navigation";
 import { test } from "./test";
 import { SF } from "./server-fns";
 import { server as _server, TypedServer } from "./server-proxy";
-import { SheetLike } from "../../src/sheet-navigation";
 
 const server = _server as TypedServer<SF>;
 
@@ -33,12 +32,22 @@ class ServerSheet {
         return server.getLastRow(this._name);
     }
 
-    getValue(row: number, column: number): Promise<any> {
-        return server.getValue(this._name, row, column);
-    }
-
-    getValues(row: number, column: number, numRows?: number, numColumns?: number): Promise<any[][]> {
-        return server.getValues(this._name, row, column, numRows, numColumns);
+    getRange(row: number, column: number, numRows: number = 1, numColumns: number = 1) {
+        const name = this._name;
+        return {
+            getValue(): Promise<any> {
+                return server.getRangeValue(name, row, column);
+            },
+            getValues(): Promise<any[][]> {
+                return server.getRangeValues(name, row, column, numRows, numColumns);
+            },
+            setValue(value: number | string | boolean | Date): Promise<void> {
+                return server.setRangeValue(name, row, column, value);
+            },
+            setValues(values: (number | string | boolean | Date)[][]): Promise<void> {
+                return server.setRangeValues(name, row, column, numRows, numColumns, values);
+            },
+        }
     }
 
     insertColumns(columnIndex: number, numColumns?: number): Promise<void> {
@@ -50,19 +59,81 @@ class ServerSheet {
     }
 }
 
+test('empty sheet', async t => {
+    const tSheet = new TestSheet([]);
+    const sSheet = await ServerSheet.create();
+
+    // number of rows & columns
+    t.is(await sSheet.getLastRow(), 0, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 0, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 0, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 0, 'unexpected value from TestSheet');
+
+    // read single cell from an empty sheet
+    t.is(await sSheet.getRange(1, 1).getValue(), '', 'unexpected value from server');
+    t.is(tSheet.getRange(1, 1).getValue(), '', 'unexpected value from TestSheet');
+
+    t.deepEqual(await sSheet.getRange(1, 1).getValues(), [['']], 'unexpected value from server');
+    t.deepEqual(tSheet.getRange(1, 1).getValues(), [['']], 'unexpected value from TestSheet');
+
+    t.deepEqual(await sSheet.getRange(1, 1, 1, 1).getValues(), [['']], 'unexpected value from server');
+    t.deepEqual(tSheet.getRange(1, 1, 1, 1).getValues(), [['']], 'unexpected value from TestSheet');
+
+    await sSheet.delete();
+});
+
 test('read & write data', async t => {
     const tSheet = new TestSheet([]);
     const sSheet = await ServerSheet.create();
 
-    // read single cell from an empty sheet
-    t.deepEqual(tSheet.getRange(1, 1).getValue(), '', 'unexpected value from TestSheet');
-    t.deepEqual(await sSheet.getValue(1, 1), '', 'unexpected value from server');
+    // write single value
+    await sSheet.getRange(1, 1).setValue(5);
+    tSheet.getRange(1, 1).setValue(5);
 
-    t.deepEqual(tSheet.getRange(1, 1).getValues(), [['']], 'unexpected value from TestSheet');
-    t.deepEqual(await sSheet.getValues(1, 1), [['']], 'unexpected value from server');
+    t.is(await sSheet.getRange(1, 1).getValue(), 5, 'unexpected value from server');
+    t.is(tSheet.getRange(1, 1).getValue(), 5, 'unexpected value from TestSheet');
 
-    t.deepEqual(tSheet.getRange(1, 1, 1, 1).getValues(), [['']], 'unexpected value from TestSheet');
-    t.deepEqual(await sSheet.getValues(1, 1, 1, 1), [['']], 'unexpected value from server');
+    t.deepEqual(await sSheet.getRange(1, 1, 1, 2).getValues(), [[5, '']], 'unexpected value from server');
+    t.deepEqual(tSheet.getRange(1, 1, 1, 2).getValues(), [[5, '']], 'unexpected value from TestSheet');
 
+    // number of rows & columns
+    t.is(await sSheet.getLastRow(), 1, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 1, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 1, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 1, 'unexpected value from TestSheet');
+
+    // write several values
+    await sSheet.getRange(2, 1, 2, 4).setValues([
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+    ]);
+    tSheet.getRange(2, 1, 2, 4).setValues([
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+    ]);
+
+    t.is(await sSheet.getRange(3, 3).getValue(), 7, 'unexpected value from server');
+    t.is(tSheet.getRange(3, 3).getValue(), 7, 'unexpected value from TestSheet');
+
+    t.deepEqual(await sSheet.getRange(1, 1, 3, 4).getValues(), [
+        [5, '', '', ''],
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+    ], 'unexpected value from server');
+    t.deepEqual(tSheet.getRange(1, 1, 3, 4).getValues(), [
+        [5, '', '', ''],
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+    ], 'unexpected value from TestSheet');
+
+    // number of rows & columns
+    t.is(await sSheet.getLastRow(), 3, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 3, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 4, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 4, 'unexpected value from TestSheet');
+    
     await sSheet.delete();
 });
