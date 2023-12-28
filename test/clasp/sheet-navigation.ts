@@ -8,6 +8,10 @@ import { server as _server, TypedServer } from "./server-proxy";
 
 const server = _server as TypedServer<SF>;
 
+/**
+ * Test utility class that wraps the corresponding server functions in a class similar to 
+ * `SheetLike`. The primary difference is that methods have to return promises.
+ */
 class ServerSheet {
     _name: string;
 
@@ -134,6 +138,57 @@ test('read & write data', async t => {
 
     t.is(await sSheet.getLastColumn(), 4, 'unexpected value from server');
     t.is(tSheet.getLastColumn(), 4, 'unexpected value from TestSheet');
+
+    // writing empty string does not change number of rows & columns
+    await sSheet.getRange(12, 15).setValue("");
+    tSheet.getRange(12, 15).setValue("");
+
+    t.is(await sSheet.getLastRow(), 3, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 3, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 4, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 4, 'unexpected value from TestSheet');
     
+    // writing 0 does change number of rows & columns
+    await sSheet.getRange(12, 15).setValue(0);
+    tSheet.getRange(12, 15).setValue(0);
+
+    t.is(await sSheet.getLastRow(), 12, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 12, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 15, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 15, 'unexpected value from TestSheet');
+
+    // writing false does change number of rows & columns
+    await sSheet.getRange(17, 19).setValue(false);
+    tSheet.getRange(17, 19).setValue(false);
+
+    t.is(await sSheet.getLastRow(), 17, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 17, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 19, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 19, 'unexpected value from TestSheet');
+
     await sSheet.delete();
 });
+
+test('insert rows & columns', async t => {
+    const tSheet = new TestSheet([]);
+    const sSheet = await ServerSheet.create();
+
+    // insert row
+    await sSheet.insertRows(1);
+    tSheet.insertRows(1);
+
+    t.is(await sSheet.getLastRow(), 0, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 0, 'unexpected value from TestSheet');
+
+    // insert column
+    await sSheet.insertColumns(1);
+    tSheet.insertColumns(1);
+
+    t.is(await sSheet.getLastRow(), 0, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 0, 'unexpected value from TestSheet');
+
+    await sSheet.delete();
+});;

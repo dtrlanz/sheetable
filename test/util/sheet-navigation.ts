@@ -10,11 +10,24 @@ export class TestSheet implements SheetLike {
     }
 
     getLastColumn(): number {
-        return this._rows.reduce((max, row) => Math.max(max, row.length), 0);
+        return this._rows.reduce((max, row) => {
+            if (!row) return max;
+            for (let i = row.length - 1; i >= max; i--) {
+                const val = row[i];
+                if (val != undefined && val !== '') return i + 1;
+            }
+            return max;
+        }, 0);
     }
 
     getLastRow(): number {
-        return this._rows.length;
+        for (let i = this._rows.length - 1; i >= 0; i--) {
+            let row = this._rows[i];
+            if (row && row.findIndex(val => val != undefined && val !== '') !== -1) {
+                return i + 1;
+            }
+        }
+        return 0;
     }
 
     getName(): string {
@@ -26,11 +39,13 @@ export class TestSheet implements SheetLike {
     }
 
     insertColumns(columnIndex: number, numColumns?: number) {
-        throw new Error('TestSheet.insertColumns() is not yet implemented');
+        this._rows.forEach(row => {
+            if (row) row.splice(columnIndex - 1, 0, ...new Array(numColumns));
+        });
     }
 
     insertRows(rowIndex: number, numRows?: number) {
-        throw new Error('TestSheet.insertRows() is not yet implemented');
+        this._rows.splice(rowIndex - 1, 0, ...new Array(numRows));
     }
 
     setName(name: string) {

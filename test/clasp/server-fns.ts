@@ -90,14 +90,14 @@ function setRangeValues(sheetName: string, row: number, column: number, numRows:
 function insertColumns(sheetName: string, columnIndex: number, numColumns?: number) {
     const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
     if (!sheet) throw new Error(`sheet ${sheetName} not found`);
-    sheet.insertColumns(columnIndex, numColumns as any ?? undefined);
+    sheet.insertColumns(columnIndex, numColumns ?? 1);
 }
 
 (globalThis as any).insertRows = insertRows;
 function insertRows(sheetName: string, rowIndex: number, numRows?: number) {
     const sheet = SpreadsheetApp.openByUrl(url).getSheetByName(sheetName);
     if (!sheet) throw new Error(`sheet ${sheetName} not found`);
-    sheet.insertRows(rowIndex, numRows as any ?? undefined);
+    sheet.insertRows(rowIndex, numRows ?? 1);
 }
 
 // Server functions for testing data types
