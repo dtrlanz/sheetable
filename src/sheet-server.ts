@@ -503,7 +503,7 @@ export class SheetClient {
     async insertColumns(columnIndex: number, numColumns?: number): Promise<void> {
         await this.request({
             orientation: this.orientation,
-            insertRows: {
+            insertColumns: {
                 index: columnIndex,
                 count: numColumns,
             },

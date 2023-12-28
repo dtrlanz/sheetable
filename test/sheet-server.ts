@@ -358,7 +358,7 @@ test('client get rows', async t => {
     t.deepEqual(data?.rows, sample.getRange(7, 1, 2, 10).getValues());
 });
 
-test.skip('insert rows', async t => {
+test('insert rows', async t => {
     const testSheet = getSampleSheet();
     const client = SheetClient.fromSheet(testSheet);
 
@@ -371,7 +371,7 @@ test.skip('insert rows', async t => {
     function insert(index: number, count: number = 1) {
         const newRows = [];
         for (let i = 0; i < count; i++) {
-            newRows.push(new Array(11));
+            newRows.push(repeat('', 10));
         }
         expected.splice(index - 1, 0, ...newRows);
     }
@@ -394,7 +394,7 @@ test.skip('insert rows', async t => {
     t.deepEqual(testValues(), expected);
 });
 
-test.skip('insert columns', async t => {
+test('insert columns', async t => {
     const testSheet = getSampleSheet();
     const client = SheetClient.fromSheet(testSheet);
 
@@ -406,7 +406,7 @@ test.skip('insert columns', async t => {
 
     function insert(index: number, count: number = 1) {
         for (const row of expected) {
-            row.splice(index - 1, 0, ...new Array(count));
+            row.splice(index - 1, 0, ...repeat('', count));
         }
     }
 
@@ -427,6 +427,14 @@ test.skip('insert columns', async t => {
     insert(10, 10);
     t.deepEqual(testValues(), expected);
 });
+
+function repeat<T>(value: T, count: number): T[] {
+    const arr = [];
+    for (let i = 0; i < count; i++) {
+        arr.push(value);
+    }
+    return arr;
+}
 
 test('write data', t => {
     const testSheet = getSampleSheet();
