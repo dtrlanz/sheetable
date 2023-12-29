@@ -177,6 +177,16 @@ test('read & write data', async t => {
     t.is(await sSheet.getLastColumn(), 19, 'unexpected value from server');
     t.is(tSheet.getLastColumn(), 19, 'unexpected value from TestSheet');
 
+    // overwriting farthest value with empty string changes number of rows & columns
+    await sSheet.getRange(17, 19).setValue('');
+    tSheet.getRange(17, 19).setValue('');
+
+    t.is(await sSheet.getLastRow(), 12, 'unexpected value from server');
+    t.is(tSheet.getLastRow(), 12, 'unexpected value from TestSheet');
+
+    t.is(await sSheet.getLastColumn(), 15, 'unexpected value from server');
+    t.is(tSheet.getLastColumn(), 15, 'unexpected value from TestSheet');
+
     await sSheet.delete();
 });
 
