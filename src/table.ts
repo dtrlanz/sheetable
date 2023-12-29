@@ -2,7 +2,7 @@ import { SheetLike } from "./sheet-navigation.js";
 import { Constructor } from "./meta-props.js";
 import { Orientation } from "./sheet-navigation.js";
 import { Value } from "./values.js";
-import { SheetClient } from "./sheet-server.js";
+import { SheetClient } from "./client.js";
 import { Index } from "./index.js";
 import { Header } from "./headers.js";
 import { getIndexTitles } from "./title.js";

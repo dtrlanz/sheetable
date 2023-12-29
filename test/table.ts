@@ -1,6 +1,6 @@
 import test from 'ava';
 import { index } from "../src/index.js";
-import { SheetClient } from "../src/sheet-server.js";
+import { SheetClient } from "../src/client.js";
 import { sheet } from "./util/sheet-navigation.js";
 import { Table } from '../src/table.js';
 

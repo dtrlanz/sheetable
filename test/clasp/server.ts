@@ -9,5 +9,5 @@ function doGet() {
     client.spreadsheet = {
         url: url,
     };
-    return client.evaluate().setTitle('Client-side tests');
+    return client.evaluate().setTitle('Tests');
 }

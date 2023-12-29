@@ -2,7 +2,7 @@ import test from 'ava';
 import { index, getIndexKeys, TupleMap, Index } from "../src/index.js";
 import { title, getIndexTitles } from "../src/title.js";
 import { sheet } from './util/sheet-navigation.js';
-import { SheetClient } from '../src/sheet-server.js';
+import { SheetClient } from '../src/client.js';
 import { Header } from '../src/headers.js';
 
 test('get keys and titles for simple index', t => {
