@@ -109,10 +109,10 @@ export class SpreadsheetServer {
         } else {
             this.sheet = obj;
         }
-        this.do = this.do.bind(this);
+        this.processRequest = this.processRequest.bind(this);
     }
 
-    do(req: SpreadsheetRequest): SpreadsheetResponse {
+    processRequest(req: SpreadsheetRequest): SpreadsheetResponse {
         let spreadsheet: Spreadsheet;
         let sheet: SheetLike | undefined;
         let sheetList: { id: number, name: string }[] | undefined;

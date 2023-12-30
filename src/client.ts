@@ -3,42 +3,118 @@ import { Branch } from "./headers.js";
 import { Sendable } from "./values.js";
 import { SpreadsheetServer, SpreadsheetRequest, SpreadsheetResponse } from "./server.js";
 
+export class SpreadsheetClient {
+    private url?: string;
+    private id?: string;
+    private name?: string;
+    private sheetList?: { id: number, name: string }[];
+
+    static serverFunctionName: string = 'processSpreadsheetRequest';
+
+    constructor(urlOrId?: string) {
+        if (urlOrId && urlOrId.includes('/')) {
+            this.url = urlOrId;
+        } else {
+            this.id = urlOrId || undefined;
+        }
+    }
+
+    private async request(request: SpreadsheetRequest): Promise<SpreadsheetResponse> {
+        let resolve: (response: SpreadsheetResponse) => void;
+        let reject: (error: Error) => void;
+        const promise = new Promise<SpreadsheetResponse>((res, rej) => {
+            resolve = res;
+            reject = rej;
+        });
+
+        google.script.run
+            .withSuccessHandler((response: SpreadsheetResponse) => {
+                this.url ??= response.spreadsheet?.url;
+                this.id ??= response.spreadsheet?.id;
+                this.name ??= response.spreadsheet?.name;
+                if (response.spreadsheet?.sheets) {
+                    this.sheetList = response.spreadsheet.sheets;
+                }
+                resolve(response);
+            })
+            .withFailureHandler(reject!)
+            [SpreadsheetClient.serverFunctionName]({
+                spreadsheetUrl: this.url,
+                spreadsheetId: this.id,
+                ...request
+            });
+
+        return promise;
+    }
+
+    getSheet(
+        sheet?: string | { name?: string, id?: number },
+        orientation: Orientation = 'normal',
+    ): SheetClient {
+        let sheetName: string | undefined;
+        let sheetId: number | undefined;
+        if (typeof sheet === 'string') {
+            sheetName = sheet;
+        } else if (sheet && (sheet.name || sheet.id != undefined)) {
+            sheetName = sheet.name;
+            sheetId = sheet.id;
+        }
+        return new SheetClient(
+            request => this.request({ sheetName, sheetId, ...request }),
+            sheetName,
+            sheetId,
+            orientation,
+        );
+    }
+
+    async getSheetByIndex(index: number, orientation: Orientation = 'normal') {
+        // may need to request sheet list first
+        if (!this.sheetList) await this.request({ listSheets: true });
+        const sheetInfo = this.sheetList!.at(index);
+        if (!sheetInfo) throw new Error(`Sheet with index ${index} not found.`);
+        return this.getSheet(sheetInfo, orientation)
+    }
+
+    async getSheetList(): Promise<{ id: number, name: string }[]> {
+        // update sheet list
+        await this.request({ listSheets: true });
+        // return cloned list
+        return this.sheetList!.map(obj => ({ ...obj }));
+    }
+}
+
 export class SheetClient {
-    readonly url?: string;
     readonly sheetName?: string;
+    readonly sheetId?: number;
     readonly orientation: Orientation;
     private readonly request: (req: SpreadsheetRequest) => Promise<SpreadsheetResponse>;
     #rowStart: number;
-    #rowStop: number;
+    #rowStop?: number;
     #colStart: number;
-    #colStop: number;
+    #colStop?: number;
     get rowStart() { return this.#rowStart; }
     get rowStop() { return this.#rowStop; }
     get colStart() { return this.#colStart; }
     get colStop() { return this.#colStop; }
 
-    private constructor(
-        url: string | undefined, 
-        sheetName: string | undefined, 
-        orientation: Orientation, 
+    constructor(
         request: (req: SpreadsheetRequest) => Promise<SpreadsheetResponse>,
-        rowStart: number,
-        rowStop: number,
-        colStart: number,
-        colStop: number,
+        sheetName?: string, 
+        sheetId?: number,
+        orientation: Orientation = 'normal', 
+        rowStart: number = 1,
+        rowStop?: number,
+        colStart: number = 1,
+        colStop?: number,
     ) {
-        this.url = url;
         this.sheetName = sheetName;
+        this.sheetId = sheetId;
         this.orientation = orientation;
         this.request = request;
         this.#rowStart = rowStart;
         this.#rowStop = rowStop;
         this.#colStart = colStart;
         this.#colStop = colStop;
-    }
-
-    static async fromUrl(url?: string, sheetName?: string, orientation: Orientation = 'normal'): Promise<SheetClient> {
-        throw new Error('SheetClient.fromUrl() not yet implemented');
     }
 
     static fromSheet(
@@ -52,13 +128,13 @@ export class SheetClient {
     ): SheetClient {
         const server = new SpreadsheetServer(sheet);
         return new SheetClient(
-            undefined,
+            req => Promise.resolve(server.processRequest(req)),
             sheetName,
+            undefined,
             orientation,
-            req => Promise.resolve(server.do(req)),
-            rowStart ?? 1,
+            rowStart,
             rowStop ?? sheet.getLastRow() + 1,
-            colStart ?? 1,
+            colStart,
             colStop ?? sheet.getLastColumn() + 1,
         );
     }
