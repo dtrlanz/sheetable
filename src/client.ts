@@ -51,14 +51,7 @@ export class SpreadsheetClient {
         sheet?: string | { name?: string, id?: number },
         orientation: Orientation = 'normal',
     ): SheetClient {
-        let sheetName: string | undefined;
-        let sheetId: number | undefined;
-        if (typeof sheet === 'string') {
-            sheetName = sheet;
-        } else if (sheet && (sheet.name || sheet.id != undefined)) {
-            sheetName = sheet.name;
-            sheetId = sheet.id;
-        }
+        const { sheetName, sheetId } = getSheetArg(sheet);
         return new SheetClient(
             request => this.request({ sheetName, sheetId, ...request }),
             sheetName,
@@ -76,11 +69,40 @@ export class SpreadsheetClient {
     }
 
     async getSheetList(): Promise<{ id: number, name: string }[]> {
-        // update sheet list
+        // update cached sheet list
         await this.request({ listSheets: true });
         // return cloned list
         return this.sheetList!.map(obj => ({ ...obj }));
     }
+
+    async insertSheet(name?: string, index?: number): Promise<{ id: number, name: string, index: number }> {
+        const { insertedSheet } = await this.request({
+            sheetName: name,
+            insertSheet: index ? { index } : true,
+        });
+        return insertedSheet!;
+    }
+
+    async deleteSheet(sheet: string | { name?: string, id: number }): Promise<void> {
+        const { sheetName, sheetId } = getSheetArg(sheet);
+        await this.request({
+            sheetName, 
+            sheetId,
+            deleteSheet: true,
+        });
+    }
+}
+
+function getSheetArg(sheet?: string | { name?: string, id?: number }) {
+    let sheetName: string | undefined;
+    let sheetId: number | undefined;
+    if (typeof sheet === 'string') {
+        sheetName = sheet;
+    } else if (sheet && (sheet.name || sheet.id != undefined)) {
+        sheetName = sheet.name;
+        sheetId = sheet.id;
+    }
+    return { sheetName, sheetId };
 }
 
 export class SheetClient {
