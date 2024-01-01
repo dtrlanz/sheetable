@@ -434,6 +434,14 @@ export class SheetClient {
         return data!;
     }
 
+    async writeRows(rowStart: number, rows: any[][]): Promise<void> {
+        await this.queueRequest({
+            orientation: this.orientation,
+            limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
+            writeData: { rowStart, rows },            
+        });
+    }
+
     async insertRows(rowPosition: number, numRows?: number): Promise<void> {
         await this.queueRequest({
             orientation: this.orientation,

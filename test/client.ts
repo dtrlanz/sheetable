@@ -84,6 +84,28 @@ test('client get rows', async t => {
     t.deepEqual(data?.rows, sample.getRange(7, 1, 2, 10).getValues());
 });
 
+test.only('client write row data', async t => {
+    const testSheet = getSampleSheet();
+    const client = SheetClient.fromSheet(testSheet);
+
+    await client.writeRows(5, [
+        [-10, -11, -12, -13, -14, -15, -16, -17, -18, -19],
+    ]);
+    await client.writeRows(7, [
+        [-30, -31, -32, -33, -34, -35, -36, -37, -38, -39],
+        [-40, -41, -42, -43, -44, -45, -46, -47, -48, -49],
+    ]);
+
+    t.deepEqual(testSheet.getRange(4, 1, 6, 10).getValues(), [
+        [  0,   1,   2,   3,   4,   5,  6,    7,   8,   9],
+        [-10, -11, -12, -13, -14, -15, -16, -17, -18, -19],
+        [ 20,  21,  22,  23,  24,  25,  26,  27,  28,  29],
+        [-30, -31, -32, -33, -34, -35, -36, -37, -38, -39],
+        [-40, -41, -42, -43, -44, -45, -46, -47, -48, -49],
+        [ 50,  51,  52,  53,  54,  55,  56,  57,  58,  59],
+    ]);
+});
+
 test('insert rows', async t => {
     const testSheet = getSampleSheet();
     const client = SheetClient.fromSheet(testSheet);
@@ -281,7 +303,7 @@ function repeat<T>(value: T, count: number): T[] {
     return arr;
 }
 
-test.only('update queued requests on row/column insertion/deletion (general)', async t => {
+test('update queued requests on row/column insertion/deletion (general)', async t => {
     const testSheet = getSampleSheet();
     const client = SheetClient.fromSheet(testSheet, undefined);
 
