@@ -22,8 +22,8 @@ export type SpreadsheetRequest = {
         colStart?: number,
         colStop?: number,
     },
-    getHeaders?: boolean,
-    getData?: boolean | {
+    readHeaders?: boolean,
+    readData?: boolean | {
         colNumbers?: number[],      // `colNumbers` takes precedence
         colHeaders?: string[],      // `colHeaders` ignored if `colNumbers` is present
         rowStart?: number,
@@ -45,7 +45,7 @@ export type SpreadsheetRequest = {
         position: number, 
         count?: number
     },
-    setData?: {
+    writeData?: {
         colNumbers?: number[],
         rowStart: number,
         rows: Sendable[][],
@@ -93,7 +93,7 @@ export type SpreadsheetResponse = {
     insertedColumns?: boolean,
     deletedRows?: boolean,
     deletedColumns?: boolean,
-    setData?: boolean,
+    wroteData?: boolean,
 };
 
 export class SpreadsheetServer {
@@ -125,7 +125,7 @@ export class SpreadsheetServer {
         let deletedColumns: SpreadsheetResponse['insertedColumns'];
         let headers: SpreadsheetResponse['headers'];
         let data: SpreadsheetResponse['data'];
-        let setData: SpreadsheetResponse['setData'];
+        let wroteData: SpreadsheetResponse['wroteData'];
     
         /****************************/
         /*  Spreadsheet operations  */
@@ -251,7 +251,7 @@ export class SpreadsheetServer {
             insertedColumns = true;
         }
         if (req.orientation === 'transposed') {
-            [insertRows, insertColumns] = [insertColumns, insertRows];
+            [insertedRows, insertedColumns] = [insertedColumns, insertedRows];
         }
 
         // *** Writing & reading data ***
@@ -261,11 +261,11 @@ export class SpreadsheetServer {
                 req.limit?.colStart, req.limit?.colStop);
 
         // Write before reading.
-        setData = false;
-        if (req.setData) {
-            const colNumbers = (req.setData.colNumbers ??
+        wroteData = false;
+        if (req.writeData) {
+            const colNumbers = (req.writeData.colNumbers ??
                 // default to all columns in the given range (or as much as there is data)
-                intRange(region.colStart, region.colStart + (req.setData.rows[0]?.length ?? 0)))
+                intRange(region.colStart, region.colStart + (req.writeData.rows[0]?.length ?? 0)))
                 // ensure column numbers are within region
                 .filter(v => v >= region.colStart && v < region.colStop);
 
@@ -274,22 +274,23 @@ export class SpreadsheetServer {
                 if (colRange) {
                     // Optimize for contiguous columns (probably more common).
                     const writeRegion = region.crop(
-                        req.setData.rowStart, req.setData.rowStart + req.setData.rows.length, 
+                        req.writeData.rowStart, req.writeData.rowStart + req.writeData.rows.length, 
                         colRange.start, colRange.stop
                     );
                     // ensure rows fit within region
-                    if (req.setData.rowStart < writeRegion.rowStart) {
-                        req.setData.rows.splice(0, writeRegion.rowStart - req.setData.rowStart);
+                    if (req.writeData.rowStart < writeRegion.rowStart) {
+                        req.writeData.rows.splice(0, writeRegion.rowStart - req.writeData.rowStart);
                     }
-                    if (req.setData.rows.length > writeRegion.rowStop - writeRegion.rowStart) {
-                        req.setData.rows.length = writeRegion.rowStop - writeRegion.rowStart;
+                    if (req.writeData.rows.length > writeRegion.rowStop - writeRegion.rowStart) {
+                        req.writeData.rows.length = writeRegion.rowStop - writeRegion.rowStart;
                     }
                     // ensure columns fit within region
-                    for (const row of req.setData.rows) {
+                    for (const row of req.writeData.rows) {
                         row.length = colNumbers.length;
                     }
                     // write data
-                    writeRegion.writeAll(req.setData.rows);
+                    // TODO: allow row array to be sparse
+                    writeRegion.writeAll(req.writeData.rows);
                 } else {
                     // Pick out non-contiguous columns.
 
@@ -302,19 +303,20 @@ export class SpreadsheetServer {
                     // 1. read existing data
                     const min = colNumbers.reduce((a, b) => a < b ? a : b);
                     const max = colNumbers.reduce((a, b) => a > b ? a : b);
-                    const writeRegion = region.crop(req.setData.rowStart, 
-                        req.setData.rowStart + req.setData.rows.length, min, max + 1);
+                    const writeRegion = region.crop(req.writeData.rowStart, 
+                        req.writeData.rowStart + req.writeData.rows.length, min, max + 1);
                     const data = writeRegion.readAll();
                     // 2. overwrite with new data
+                    // TODO: allow row array to be sparse
                     for (let i = 0; i < data.length; i++) {
                         for (let j = 0; j < colNumbers.length; j++) {
-                            data[i][colNumbers[j] - min] = req.setData.rows[i][j];
+                            data[i][colNumbers[j] - min] = req.writeData.rows[i][j];
                         }
                     }
                     // 3. write data back to sheet
                     writeRegion.writeAll(data);
                 }
-                setData = true;
+                wroteData = true;
             }
         }
 
@@ -325,8 +327,8 @@ export class SpreadsheetServer {
         // Need to find headers if:
         // - requester asked for headers OR
         // - requester asked for data based on headers (`colHeaders: [...]`)
-        const headersNeeded = req.getHeaders || typeof req.getData === 'object' 
-            && req.getData.colHeaders && !req.getData.colNumbers;
+        const headersNeeded = req.readHeaders || typeof req.readData === 'object' 
+            && req.readData.colHeaders && !req.readData.colNumbers;
 
         
         let dataRegion = region;
@@ -340,12 +342,12 @@ export class SpreadsheetServer {
         }
 
         // Retrieve requested columns
-        if (req.getData) {
-            if (typeof req.getData === 'object') {
-                dataRegion = dataRegion.crop(req.getData.rowStart, req.getData.rowStop);
+        if (req.readData) {
+            if (typeof req.readData === 'object') {
+                dataRegion = dataRegion.crop(req.readData.rowStart, req.readData.rowStop);
             }
 
-            if (req.getData === true || (!req.getData.colNumbers && !req.getData.colHeaders)) {
+            if (req.readData === true || (!req.readData.colNumbers && !req.readData.colHeaders)) {
                 // include all columns
                 data = {
                     rows: dataRegion.readAll(),
@@ -354,17 +356,17 @@ export class SpreadsheetServer {
                 };
             } else {
                 // include specific columns
-                let colNumbers = req.getData.colNumbers?.filter(v => 
+                let colNumbers = req.readData.colNumbers?.filter(v => 
                     // ensure column numbers are within data region
                     v >= dataRegion.colStart && v < dataRegion.colStop);
 
                 if (!colNumbers) {
                     colNumbers = [];
-                    if (!headers || !req.getData.colHeaders) throw new Error('unreachable');
+                    if (!headers || !req.readData.colHeaders) throw new Error('unreachable');
                     // Note: The `colHeaders` array specifies top-level headers. If any header spans
                     // multiple columns, include all columns.
                     for (const h of headers) {
-                        if (req.getData.colHeaders.includes(h.label)) {
+                        if (req.readData.colHeaders.includes(h.label)) {
                             colNumbers.splice(colNumbers.length, 0, ...intRange(h.start, h.stop));
                         }
                     }
@@ -418,7 +420,7 @@ export class SpreadsheetServer {
                 insertedRows, 
                 deletedRows,
                 deletedColumns,
-                setData,
+                wroteData,
             };
         }
     }

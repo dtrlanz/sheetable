@@ -1,7 +1,7 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
 import { Branch } from '../src/headers.js';
-import { SheetClient } from '../src/client.js';
+import { SheetClient, SheetEventParams } from '../src/client.js';
 
 function getSampleSheet() {
     return sheet`
@@ -280,3 +280,112 @@ function repeat<T>(value: T, count: number): T[] {
     }
     return arr;
 }
+
+test.only('update queued requests on row/column insertion/deletion (general)', async t => {
+    const testSheet = getSampleSheet();
+    const client = SheetClient.fromSheet(testSheet, undefined);
+
+    // track events for debugging
+    const eventArgs: [...args: SheetEventParams<'structuralChange'>][] = [];
+    client.addEventListener('structuralChange', (...args) => eventArgs.push(args));
+
+    // Insert rows
+    const beforeInsertingRows = client.getRows(6, 7);
+    const insertRows = client.insertRows(5, 2);
+    const afterInsertingRows = client.getRows(6, 7);
+    t.deepEqual(await beforeInsertingRows, {
+        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        rowOffset: 6,
+    });
+    await insertRows;
+    // confirm that event fired
+    t.deepEqual(eventArgs.at(-1), ['inserted', 'rows', 5, 2]);
+    // confirm that request was updated
+    t.deepEqual(client['requestsSent'][0].request.readData, {
+        rowStart: 8,    // originally 6
+        rowStop: 9,     // originally 7
+    });
+    // confirm that the data retrieved is what was originally in row 6 (now row 8)
+    t.deepEqual(await afterInsertingRows, {
+        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        rowOffset: 8,
+    });
+
+    // Delete rows
+    const beforeDeletingRows = client.getRows(7, 8);
+    const deleteRows = client.deleteRows(5, 2);
+    const afterDeletingRows = client.getRows(7, 8);
+    t.deepEqual(await beforeDeletingRows, {
+        rows: [[10, 11, 12, 13, 14, 15, 16, 17, 18, 19]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        rowOffset: 7,
+    });
+    await deleteRows;
+    // confirm that event fired
+    t.deepEqual(eventArgs.at(-1), ['deleted', 'rows', 5, 2]);
+    // confirm that request was updated
+    t.deepEqual(client['requestsSent'][0].request.readData, {
+        rowStart: 5,    // originally 7
+        rowStop: 6,     // originally 8
+    });
+    // confirm that the data retrieved is what was originally in row 7 (now row 5)
+    t.deepEqual(await afterDeletingRows, {
+        rows: [[10, 11, 12, 13, 14, 15, 16, 17, 18, 19]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        rowOffset: 5,
+    });
+
+    // Insert columns
+    const beforeInsertingColumns = client.getRows(6, 7);
+    const insertColumns = client.insertColumns(5, 2);
+    const afterInsertingColumns = client.getRows(6, 7);
+    t.deepEqual(await beforeInsertingColumns, {
+        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        rowOffset: 6,
+    });
+    await insertColumns;
+    // confirm that event fired
+    t.deepEqual(eventArgs.at(-1), ['inserted', 'columns', 5, 2]);
+    // confirm that request was updated
+    t.deepEqual(client['requestsSent'][0].request.limit, {
+        rowStart: 6,
+        rowStop: 7,
+        colStart: 1,
+        colStop: 13,    // originally 11
+    });
+    // confirm that the data retrieved reflects the column insertion
+    t.deepEqual(await afterInsertingColumns, {
+        rows: [[20, 21, 22, 23, undefined, undefined, 24, 25, 26, 27, 28, 29]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        rowOffset: 6,
+    });
+
+    // Delete columns
+    const beforeDeletingColumns = client.getRows(6, 7);
+    const deleteColumns = client.deleteColumns(5, 2);
+    const afterDeletingColumns = client.getRows(6, 7);
+    t.deepEqual(await beforeDeletingColumns, {
+        rows: [[20, 21, 22, 23, undefined, undefined, 24, 25, 26, 27, 28, 29]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        rowOffset: 6,
+    });
+    await deleteColumns;
+    // confirm that event fired
+    t.deepEqual(eventArgs.at(-1), ['deleted', 'columns', 5, 2]);
+    // confirm that request was updated
+    t.deepEqual(client['requestsSent'][0].request.limit, {
+        rowStart: 6,
+        rowStop: 7,
+        colStart: 1,
+        colStop: 11,    // originally 13
+    });
+    // confirm that the data retrieved reflects the column deletion
+    t.deepEqual(await afterDeletingColumns, {
+        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
+        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        rowOffset: 6,
+    });
+});
