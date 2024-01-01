@@ -413,7 +413,7 @@ test('update queued requests on row/column insertion/deletion (general)', async 
     });
 });
 
-test.only('update queued requests on row deletion (specific)', async t => {
+test('update queued requests on row deletion (specific cases)', async t => {
     async function testCase<T>(
         cmd: (c: SheetClient) => Promise<T>, 
         test: (o: { sheet: SheetLike, result: T }) => void,
@@ -558,3 +558,151 @@ test.only('update queued requests on row deletion (specific)', async t => {
         ], 'column insertion should proceed unaffected'),
     );
 });
+
+test.only('update queued requests on row insertion (specific cases)', async t => {
+    async function testCase<T>(
+        cmd: (c: SheetClient) => Promise<T>, 
+        test: (o: { sheet: SheetLike, result: T }) => void,
+    ) {
+        const sheet = getSampleSheet();
+        const client = SheetClient.fromSheet(sheet, undefined);
+        // request row insertion (2 new rows before row 6)
+        const insertRows = client.insertRows(6, 2);
+        // queue other request
+        const otherRequest = cmd(client);
+        // row insertion may affect other request
+        await insertRows;
+        // run assertions
+        const result = await otherRequest;
+        test({ sheet, result });
+    }
+
+    await testCase(
+        () => Promise.resolve(),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 9, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  5
+            ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
+            [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],   // row  9 (old  7)
+            [40, 41, 42, 43, 44, 45, 46, 47, 48, 49],   // row 10 (old  8)
+            [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],   // row 11 (old  9)
+            [60, 61, 62, 63, 64, 65, 66, 67, 68, 69],   // row 12 (old 10)
+        ], 'reference case'),
+    );
+
+    await testCase(
+        client => client.getRows(5, 8),
+        ({ result }) => t.deepEqual(result, {
+            colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            rows: [
+                [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  5
+                ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+                ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+                [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
+                [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],   // row  9 (old  7)
+            ],
+            rowOffset: 5,
+        }, 'read should cover requested range but include inserted rows'),
+    );
+
+    await testCase(
+        client => client.writeRows(5, [
+            [-10, -11, -12, -13, -14, -15, -16, -17, -18, -19],   // row 5
+            [-20, -21, -22, -23, -24, -25, -26, -27, -28, -29],   // row 6
+            [-30, -31, -32, -33, -34, -35, -36, -37, -38, -39],   // row 7
+        ]),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 9, 10).getValues(), [
+            [  0,   1,   2,   3,   4,   5,   6,   7,   8,   9],   // row  4
+            [-10, -11, -12, -13, -14, -15, -16, -17, -18, -19],   // row  5
+            [ '',  '',  '',  '',  '',  '',  '',  '',  '',  ''],   // row  6 (new)
+            [ '',  '',  '',  '',  '',  '',  '',  '',  '',  ''],   // row  7 (new)
+            [-20, -21, -22, -23, -24, -25, -26, -27, -28, -29],   // row  8 (old 6)
+            [-30, -31, -32, -33, -34, -35, -36, -37, -38, -39],   // row  9 (old 7)
+            [ 40,  41,  42,  43,  44,  45,  46,  47,  48,  49],   // row 10 (old 8)
+        ], 'write should affect requested rows (only)'),
+    );
+
+    await testCase(
+        client => client.insertRows(5),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 6, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
+            ['', '', '', '', '', '', '', '', '', ''],   // row  5 (new)
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  6 (old 5)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  8 (new)
+            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  9 (old  6)
+        ], 'row insertion before should proceed unaffected'),
+    );
+
+    await testCase(
+        client => client.insertRows(10),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 7, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  5
+            ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  9 (new)
+            [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],   // row 10 (old  7)
+        ], 'row insertion after should shift down'),
+    );
+
+    await testCase(
+        client => client.deleteRows(5),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 4, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row 4
+            ['', '', '', '', '', '', '', '', '', ''],   // row 5 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row 6 (new)
+            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row 7 (old 6)
+        ], 'row deletion before should proceed unaffected'),
+    );
+
+    await testCase(
+        client => client.deleteRows(7),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 6, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  5
+            ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
+            [40, 41, 42, 43, 44, 45, 46, 47, 48, 49],   // row  9 (old  8)
+        ], 'row deletion after should shift down'),
+    );
+
+    await testCase(
+        //delete rows 5, 6, 7
+        client => client.deleteRows(5, 3),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 5, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
+            ['', '', '', '', '', '', '', '', '', ''],   // row  5 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            [40, 41, 42, 43, 44, 45, 46, 47, 48, 49],   // row  7 (old 8)
+            [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],   // row  8 (old 9)
+        ], 'overlapping row deletion should not affect newly inserted rows'),
+    );
+
+    await testCase(
+        client => client.deleteColumns(4, 2),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 5, 10).getValues(), [
+            [ 0,  1,  2,  5,  6,  7,  8,  9],   // row  4
+            [10, 11, 12, 15, 16, 17, 18, 19],   // row  5
+            ['', '', '', '', '', '', '', ''],   // row  6 (new)
+            ['', '', '', '', '', '', '', ''],   // row  7 (new)
+            [20, 21, 22, 25, 26, 27, 28, 29],   // row  8 (old  6)
+        ], 'column deletion should proceed unaffected'),
+    );
+    
+    await testCase(
+        client => client.insertColumns(4, 2),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 5, 10).getValues(), [
+            [ 0,  1,  2, '', '',  3,  4,  5,  6,  7,  8,  9],   // row  4
+            [10, 11, 12, '', '', 13, 14, 15, 16, 17, 18, 19],   // row  5
+            ['', '', '', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            ['', '', '', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+            [20, 21, 22, '', '', 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
+        ], 'column insertion should proceed unaffected'),
+    );
+});
+
