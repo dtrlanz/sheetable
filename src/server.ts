@@ -54,7 +54,7 @@ export type SpreadsheetRequest = {
     writeData?: {
         colNumbers?: number[],
         rowStart: number,
-        rows: Sendable[][],
+        rows: (Sendable[] | undefined)[],
     },
 };
 
@@ -307,15 +307,26 @@ export class SpreadsheetServer {
                     if (req.writeData.rows.length > writeRegion.rowStop - writeRegion.rowStart) {
                         req.writeData.rows.length = writeRegion.rowStop - writeRegion.rowStart;
                     }
-                    // ensure columns fit within region & fix sparse `rows` arrays
-                    for (let i = 0; i < req.writeData.rows.length; i++) {
-                        if (req.writeData.rows[i]) 
-                            req.writeData.rows[i].length = colNumbers.length;
-                        else
-                            req.writeData.rows[i] = Array(colNumbers.length);
+                    // only write rows with data
+                    let section = [];
+                    let start = 0;
+                    for (let i = 0; i < req.writeData.rows.length + 1; i++) {
+                        if (req.writeData.rows[i]) {
+                            // ensure columns fit within region
+                            req.writeData.rows[i]!.length = colNumbers.length;
+                            section.push(req.writeData.rows[i] as any[][]);
+                        } else {
+                            if (i > start) {
+                                // write data
+                                writeRegion
+                                    .crop(req.writeData.rowStart + start, req.writeData.rowStart + i)
+                                    .writeAll(section);
+                                // restart for next section
+                                section = [];
+                            }
+                            start = i + 1;
+                        }
                     }
-                    // write data
-                    writeRegion.writeAll(req.writeData.rows);
                 } else {
                     // Pick out non-contiguous columns.
 
@@ -333,6 +344,7 @@ export class SpreadsheetServer {
                     const data = writeRegion.readAll();
                     // 2. overwrite with new data
                     for (let i = 0; i < data.length; i++) {
+                        if (!req.writeData.rows[i]) continue;
                         for (let j = 0; j < colNumbers.length; j++) {
                             data[i][colNumbers[j] - min] = req.writeData.rows[i]?.[j];
                         }

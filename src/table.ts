@@ -213,7 +213,7 @@ export class Table<T extends object> {
             this.slots.push(slot);
             return slot;
         });
-        slot.changed = true,
+        slot.changed = true;
         slot.cached = this.toCached(record);
         return slot.idx;
     }
@@ -223,21 +223,27 @@ export class Table<T extends object> {
         this.saved = this.saved.then(async () => {
             // collect data changed since last save
             let arr: (T | undefined)[] | undefined;
-            let firstRow = 0;
-            for (const { row, changed, cached } of this.slots) {
-                if (!changed) {
+            let firstRow = 0, lastRow = 0;
+            for (const s of this.slots) {
+                if (!s.changed) {
                     arr?.push(undefined);
                 } else if (arr) {
-                    arr.push(cached);
+                    arr.push(s.cached);
+                    s.changed = false;
+                    lastRow = s.row;
                 } else {
-                    arr = [cached];
-                    firstRow = row;
+                    arr = [s.cached];
+                    s.changed = false;
+                    firstRow = lastRow = s.row;
                 }
             }
             // save to sheet
             if (!arr) return;
             await this.client.extend(this.rowStop);
-            await this.client.writeRows(firstRow, arr.map(this.header.getRowValues));
+            await this.client.writeRows(firstRow, 
+                arr.slice(0, lastRow - firstRow + 1)
+                .map(r => r ? this.header.getRowValues(r) : undefined)
+            );
         });
         return this.saved;
     }

@@ -439,7 +439,7 @@ export class SheetClient {
                 }
                 if (request.writeData) {
                     const width = request.writeData.rows.reduce((max, cur) => 
-                        Math.max(max, cur.length), 0);
+                        Math.max(max, cur?.length ?? 0), 0);
                     if (width !== 0) {
                         if (!request.writeData.colNumbers) {
                             const start = request.limit?.colStart ?? 1;
@@ -454,6 +454,7 @@ export class SheetClient {
                             if (mappedColNumbers[i] == undefined) deleteArr.push(i);
                         }
                         for (const row of request.writeData.rows) {
+                            if (!row) continue;
                             for (const idx of deleteArr) {
                                 row.splice(idx, 1);
                             }
@@ -509,7 +510,7 @@ export class SheetClient {
                 }
                 if (request.writeData) {
                     const width = request.writeData.rows.reduce((max, cur) => 
-                        Math.max(max, cur.length), 0);
+                        Math.max(max, cur?.length ?? 0), 0);
                     if (width !== 0) {
                         if (!request.writeData.colNumbers) {
                             const start = request.limit?.colStart ?? 1;
@@ -548,7 +549,7 @@ export class SheetClient {
         return data!;
     }
 
-    async writeRows(rowStart: number, rows: any[][]): Promise<void> {
+    async writeRows(rowStart: number, rows: (any[] | undefined)[]): Promise<void> {
         await this.queueRequest({
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             writeData: { rowStart, rows },            
