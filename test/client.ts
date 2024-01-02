@@ -671,20 +671,17 @@ test('update queued requests on row insertion (specific cases)', async t => {
         ], 'row deletion after should shift down'),
     );
 
-    // TODO: overlapping row deletion
-    // desired behavior would be analagous to write but that's a bit trickier to implement
-
-    // await testCase(
-    //     //delete rows 5, 6, 7
-    //     client => client.deleteRows(5, 3),
-    //     ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 5, 10).getValues(), [
-    //         [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
-    //         ['', '', '', '', '', '', '', '', '', ''],   // row  5 (new)
-    //         ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
-    //         [40, 41, 42, 43, 44, 45, 46, 47, 48, 49],   // row  7 (old 8)
-    //         [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],   // row  8 (old 9)
-    //     ], 'overlapping row deletion should not affect newly inserted rows'),
-    // );
+    await testCase(
+        //delete rows 5, 6, 7
+        client => client.deleteRows(5, 3),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 5, 10).getValues(), [
+            [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9],   // row  4
+            ['', '', '', '', '', '', '', '', '', ''],   // row  5 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            [40, 41, 42, 43, 44, 45, 46, 47, 48, 49],   // row  7 (old 8)
+            [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],   // row  8 (old 9)
+        ], 'overlapping row deletion should not affect newly inserted rows'),
+    );
 
     await testCase(
         client => client.deleteColumns(4, 2),
@@ -941,17 +938,14 @@ test('update queued requests on column insertion (specific cases)', async t => {
         ], 'column deletion after should shift right'),
     );
 
-    // TODO: overlapping column deletion
-    // desired behavior would be analagous to write but that's a bit trickier to implement
-
-    // await testCase(
-    //     //delete rows 5, 6, 7
-    //     client => client.deleteRows(5, 3),
-    //     ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 2, 9).getValues(), [
-    //         [ 0,  1,  2,  3, '', '',  7,  8,  9],   // row 4
-    //         [10, 11, 12, 13, '', '', 17, 18, 19],   // row 5
-    //     ], 'overlapping column deletion should not affect newly inserted rows'),
-    // );
+    await testCase(
+        //delete columns 5, 6, 7
+        client => client.deleteColumns(5, 3),
+        ({ sheet }) => t.deepEqual(sheet.getRange(4, 1, 2, 9).getValues(), [
+            [ 0,  1,  2,  3, '', '',  7,  8,  9],   // row 4
+            [10, 11, 12, 13, '', '', 17, 18, 19],   // row 5
+        ], 'overlapping column deletion should not affect newly inserted columns'),
+    );
 
     await testCase(
         client => client.insertColumns(4),

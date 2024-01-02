@@ -220,21 +220,27 @@ export class SheetClient {
         const getListeners = () => this.listeners.get('structuralChange') as any;
         if (response.deletedRows) {
             listeners = getListeners();
-            listeners?.forEach(l => l(
-                'deleted', 
-                'rows', 
-                request.deleteRows!.start, 
-                request.deleteRows!.stop - request.deleteRows!.start,
-            ));
+            for (const del of Array.isArray(request.deleteRows)? request.deleteRows : [request.deleteRows!]) {
+                if (!(del.stop > del.start)) continue;
+                listeners?.forEach(l => l(
+                    'deleted', 
+                    'rows', 
+                    del.start, 
+                    del.stop - del.start,
+                ));
+            }
         }
         if (response.deletedColumns) {
             listeners ??= getListeners();
-            listeners?.forEach(l => l(
-                'deleted', 
-                'columns', 
-                request.deleteColumns!.start, 
-                request.deleteColumns!.stop - request.deleteColumns!.start,
-            ));
+            for (const del of Array.isArray(request.deleteColumns)? request.deleteColumns : [request.deleteColumns!]) {
+                if (!(del.stop > del.start)) continue;
+                listeners?.forEach(l => l(
+                    'deleted', 
+                    'columns', 
+                    del.start, 
+                    del.stop - del.start,
+                ));
+            }
         }
         if (response.insertedRows) {
             listeners ??= getListeners();
@@ -319,10 +325,14 @@ export class SheetClient {
                     request.limit!.rowStart! -= Math.min(count, request.limit!.rowStart! - position);
                 if (request.limit?.rowStop! > position)
                     request.limit!.rowStop! -= Math.min(count, request.limit!.rowStop! - position);
-                if (request.deleteRows?.start! > position)
-                    request.deleteRows!.start -= Math.min(count, request.deleteRows!.start - position);
-                if (request.deleteRows?.stop! > position)
-                    request.deleteRows!.stop -= Math.min(count, request.deleteRows!.stop - position);
+                if (request.deleteRows) {
+                    for (const del of Array.isArray(request.deleteRows) ? request.deleteRows : [request.deleteRows]) {
+                        if (del.start > position)
+                            del.start -= Math.min(count, del.start - position);
+                        if (del.stop! > position)
+                            del.stop -= Math.min(count, del.stop - position);
+                    }
+                }
                 if (request.insertRows?.position! > position)
                     request.insertRows!.position -= Math.min(count, request.insertRows!.position! - position);
                 if (typeof request.readData === 'object') {
@@ -362,10 +372,25 @@ export class SheetClient {
                     request.limit!.rowStart! += count;
                 if (request.limit?.rowStop! > position)
                     request.limit!.rowStop! += count;
-                if (request.deleteRows?.start! >= position)
-                    request.deleteRows!.start += count;
-                if (request.deleteRows?.stop! > position)
-                    request.deleteRows!.stop += count;
+                if (request.deleteRows) {
+                    if (!Array.isArray(request.deleteRows)) request.deleteRows = [request.deleteRows];
+                    for (let i = 0; i < request.deleteRows.length; i++) {
+                        const del = request.deleteRows[i];
+                        if (del.start >= position) {
+                            del.start += count;
+                            del.stop += count;
+                        } else if (del.stop > position) {
+                            // Overlapping deletion should not affect newly inserted rows.
+                            // Split range in two (before & after insertion).
+                            const part2 = {
+                                start: position + count,
+                                stop: del.stop + count,
+                            };
+                            del.stop = position;
+                            request.deleteRows.splice(++i, 0, part2);
+                        }
+                    }
+                }
                 if (request.insertRows?.position! >= position)
                     request.insertRows!.position += count;
                 if (typeof request.readData === 'object' && request.readData.rowStart! >= position)
@@ -398,10 +423,14 @@ export class SheetClient {
                     request.limit!.colStart! -= Math.min(count, request.limit!.colStart! - position);
                 if (request.limit?.colStop! > position)
                     request.limit!.colStop! -= Math.min(count, request.limit!.colStop! - position);
-                if (request.deleteColumns?.start! > position)
-                    request.deleteColumns!.start -= Math.min(count, request.deleteColumns!.start - position);
-                if (request.deleteColumns?.stop! > position)
-                    request.deleteColumns!.stop -= Math.min(count, request.deleteColumns!.stop - position);
+                if (request.deleteColumns) {
+                    for (const del of Array.isArray(request.deleteColumns) ? request.deleteColumns : [request.deleteColumns]) {
+                        if (del.start > position)
+                            del.start -= Math.min(count, del.start - position);
+                        if (del.stop! > position)
+                            del.stop -= Math.min(count, del.stop - position);
+                    }
+                }
                 if (request.insertColumns?.position! > position)
                     request.insertColumns!.position -= Math.min(count, request.insertColumns!.position! - position);
                 if (typeof request.readData === 'object' && request.readData.colNumbers) {
@@ -454,10 +483,25 @@ export class SheetClient {
                     request.limit!.colStart! += count;
                 if (request.limit?.colStop! > position)
                     request.limit!.colStop! += count;
-                if (request.deleteColumns?.start! >= position)
-                    request.deleteColumns!.start += count;
-                if (request.deleteColumns?.stop! > position)
-                    request.deleteColumns!.stop += count;
+                if (request.deleteColumns) {
+                    if (!Array.isArray(request.deleteColumns)) request.deleteColumns = [request.deleteColumns];
+                    for (let i = 0; i < request.deleteColumns.length; i++) {
+                        const del = request.deleteColumns[i];
+                        if (del.start >= position) {
+                            del.start += count;
+                            del.stop += count;
+                        } else if (del.stop > position) {
+                            // Overlapping deletion should not affect newly inserted columns.
+                            // Split range in two (before & after insertion).
+                            const part2 = {
+                                start: position + count,
+                                stop: del.stop + count,
+                            };
+                            del.stop = position;
+                            request.deleteColumns.splice(++i, 0, part2);
+                        }
+                    }
+                }
                 if (request.insertColumns?.position! >= position)
                     request.insertColumns!.position += count;
                 if (typeof request.readData === 'object' && request.readData.colNumbers) {

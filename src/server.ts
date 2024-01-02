@@ -40,11 +40,17 @@ export type SpreadsheetRequest = {
     deleteRows?: {
         start: number, 
         stop: number
-    },
+    } | {
+        start: number, 
+        stop: number
+    }[],
     deleteColumns?: {
         start: number, 
         stop: number
-    },
+    } | {
+        start: number, 
+        stop: number
+    }[],
     writeData?: {
         colNumbers?: number[],
         rowStart: number,
@@ -225,13 +231,27 @@ export class SpreadsheetServer {
         if (req.orientation === 'transposed') {
             [deleteRows, deleteColumns] = [deleteColumns, deleteRows];
         }
+        // Deletions must be processed in decreasing order of row/column number so that later
+        // deletions are not affected by earlier ones.
         if (deleteRows) {
-            sheet.deleteRows(deleteRows.start, deleteRows.stop - deleteRows.start);
-            deletedRows = true;
+            const arr = Array.isArray(deleteRows)? deleteRows : [deleteRows];
+            let min = Infinity;
+            for (let i = arr.length - 1; i >= 0; i--) {
+                if (arr[i].stop > min) throw new Error('deletion array must be sorted and its ranges must not overlap');
+                min = arr[i].start;
+                sheet.deleteRows(arr[i].start, arr[i].stop - arr[i].start);
+                deletedRows ||= arr[i].stop > arr[i].start;
+            }
         }
         if (deleteColumns) {
-            sheet.deleteColumns(deleteColumns.start, deleteColumns.stop - deleteColumns.start);
-            deletedColumns = true;
+            const arr = Array.isArray(deleteColumns)? deleteColumns : [deleteColumns];
+            let min = Infinity;
+            for (let i = arr.length - 1; i >= 0; i--) {
+                if (arr[i].stop > min) throw new Error('deletion array must be sorted and its ranges must not overlap');
+                min = arr[i].start;
+                sheet.deleteColumns(arr[i].start, arr[i].stop - arr[i].start);
+                deletedColumns ||= arr[i].stop > arr[i].start;
+            }
         }
         if (req.orientation === 'transposed') {
             [deletedRows, deletedColumns] = [deletedColumns, deletedRows];
