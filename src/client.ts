@@ -223,8 +223,8 @@ export class SheetClient {
             listeners?.forEach(l => l(
                 'deleted', 
                 'rows', 
-                request.deleteRows!.position, 
-                request.deleteRows!.count ?? 1,
+                request.deleteRows!.start, 
+                request.deleteRows!.stop - request.deleteRows!.start,
             ));
         }
         if (response.deletedColumns) {
@@ -232,8 +232,8 @@ export class SheetClient {
             listeners?.forEach(l => l(
                 'deleted', 
                 'columns', 
-                request.deleteColumns!.position, 
-                request.deleteColumns!.count ?? 1,
+                request.deleteColumns!.start, 
+                request.deleteColumns!.stop - request.deleteColumns!.start,
             ));
         }
         if (response.insertedRows) {
@@ -319,16 +319,10 @@ export class SheetClient {
                     request.limit!.rowStart! -= Math.min(count, request.limit!.rowStart! - position);
                 if (request.limit?.rowStop! > position)
                     request.limit!.rowStop! -= Math.min(count, request.limit!.rowStop! - position);
-                if (request.deleteRows) {
-                    if (request.deleteRows.position! > position)
-                            request.deleteRows.position -= Math.min(count, request.deleteRows.position - position);
-                    else if (request.deleteRows.position + (request.deleteRows.count ?? 1) > position) {
-                        request.deleteRows.count = 
-                            position - request.deleteRows.position + Math.max(0, 
-                                request.deleteRows.position + (request.deleteRows.count ?? 1)
-                                - position - count);
-                    }
-                }
+                if (request.deleteRows?.start! > position)
+                    request.deleteRows!.start -= Math.min(count, request.deleteRows!.start - position);
+                if (request.deleteRows?.stop! > position)
+                    request.deleteRows!.stop -= Math.min(count, request.deleteRows!.stop - position);
                 if (request.insertRows?.position! > position)
                     request.insertRows!.position -= Math.min(count, request.insertRows!.position! - position);
                 if (typeof request.readData === 'object') {
@@ -348,7 +342,7 @@ export class SheetClient {
                     } else if (request.writeData.rowStart + request.writeData.rows.length > position) {
                         // remove data for deleted rows
                         request.writeData.rows.splice(position - request.writeData.rowStart,
-                            request.writeData.rowStart + request.writeData.rows.length - position);
+                            count);
                     }
                 }
             }
@@ -366,15 +360,17 @@ export class SheetClient {
             for (const { request } of this.requestsQueued) {
                 if (request.limit?.rowStart! >= position)
                     request.limit!.rowStart! += count;
-                if (request.limit?.rowStop! >= position)
+                if (request.limit?.rowStop! > position)
                     request.limit!.rowStop! += count;
-                if (request.deleteRows?.position! >= position)
-                    request.deleteRows!.position += count;
+                if (request.deleteRows?.start! >= position)
+                    request.deleteRows!.start += count;
+                if (request.deleteRows?.stop! > position)
+                    request.deleteRows!.stop += count;
                 if (request.insertRows?.position! >= position)
                     request.insertRows!.position += count;
                 if (typeof request.readData === 'object' && request.readData.rowStart! >= position)
                     request.readData.rowStart! += count;
-                if (typeof request.readData === 'object' && request.readData.rowStop! >= position)
+                if (typeof request.readData === 'object' && request.readData.rowStop! > position)
                     request.readData.rowStop! += count;
                 if (request.writeData) {
                     if (request.writeData.rowStart >= position)
@@ -382,7 +378,7 @@ export class SheetClient {
                     else if (request.writeData.rowStart + request.writeData.rows.length > position) {
                         // split data into two blocks, before and after inserted rows
                         request.writeData.rows.splice(position - request.writeData.rowStart,
-                            0, Array(count));
+                            0, ...Array(count));
                     }
                 }
             }
@@ -397,7 +393,52 @@ export class SheetClient {
                 this.#colStop! -= Math.min(count, this.#colStop! - position);
 
             // Update column numbers in queued requests to account for deleted columns.
-            throw new Error('not yet implemented: update column numbers in queued requests to account for deleted columns');
+            for (const { request } of this.requestsQueued) {
+                if (request.limit?.colStart! > position)
+                    request.limit!.colStart! -= Math.min(count, request.limit!.colStart! - position);
+                if (request.limit?.colStop! > position)
+                    request.limit!.colStop! -= Math.min(count, request.limit!.colStop! - position);
+                if (request.deleteColumns?.start! > position)
+                    request.deleteColumns!.start -= Math.min(count, request.deleteColumns!.start - position);
+                if (request.deleteColumns?.stop! > position)
+                    request.deleteColumns!.stop -= Math.min(count, request.deleteColumns!.stop - position);
+                if (request.insertColumns?.position! > position)
+                    request.insertColumns!.position -= Math.min(count, request.insertColumns!.position! - position);
+                if (typeof request.readData === 'object' && request.readData.colNumbers) {
+                    request.readData.colNumbers = request.readData.colNumbers.map(mapColumn)
+                        .filter(col => col != undefined) as number[];
+                }
+                if (request.writeData) {
+                    const width = request.writeData.rows.reduce((max, cur) => 
+                        Math.max(max, cur.length), 0);
+                    if (width !== 0) {
+                        if (!request.writeData.colNumbers) {
+                            const start = request.limit?.colStart ?? 1;
+                            request.writeData.colNumbers = range(start, start + width);
+                        }
+                        const mappedColNumbers = request.writeData.colNumbers.map(mapColumn);
+                        request.writeData.colNumbers = mappedColNumbers
+                            .filter(col => col != undefined) as number[];
+
+                        const deleteArr: number[] = [];
+                        for (let i = mappedColNumbers.length - 1; i >= 0; i--) {
+                            if (mappedColNumbers[i] == undefined) deleteArr.push(i);
+                        }
+                        for (const row of request.writeData.rows) {
+                            for (const idx of deleteArr) {
+                                row.splice(idx, 1);
+                            }
+                        }
+                    }
+                }
+            }
+            return;
+
+            function mapColumn(col: number) {
+                return col < position ? col
+                    : col >= position + count ? col - count
+                    : undefined;
+            }
         }
         
         if (change === 'inserted' && dimension === 'columns') {
@@ -408,7 +449,38 @@ export class SheetClient {
                 this.#colStop! += count;
 
             // Update column numbers in queued requests to account for inserted columns.
-            throw new Error('Not yet implemented: update column numbers in queued requests to account for inserted columns')
+            for (const { request } of this.requestsQueued) {
+                if (request.limit?.colStart! >= position)
+                    request.limit!.colStart! += count;
+                if (request.limit?.colStop! > position)
+                    request.limit!.colStop! += count;
+                if (request.deleteColumns?.start! >= position)
+                    request.deleteColumns!.start += count;
+                if (request.deleteColumns?.stop! > position)
+                    request.deleteColumns!.stop += count;
+                if (request.insertColumns?.position! >= position)
+                    request.insertColumns!.position += count;
+                if (typeof request.readData === 'object' && request.readData.colNumbers) {
+                    request.readData.colNumbers = request.readData.colNumbers.map(mapColumn);
+                }
+                if (request.writeData) {
+                    const width = request.writeData.rows.reduce((max, cur) => 
+                        Math.max(max, cur.length), 0);
+                    if (width !== 0) {
+                        if (!request.writeData.colNumbers) {
+                            const start = request.limit?.colStart ?? 1;
+                            request.writeData.colNumbers = range(start, start + width);
+                        }
+                        request.writeData.colNumbers = request.writeData.colNumbers.map(mapColumn);
+                    }
+                }
+            }
+            return;
+
+            function mapColumn(col: number) {
+                return col < position ? col
+                    : col + count;
+            }
         }
     }
 
@@ -462,23 +534,29 @@ export class SheetClient {
         });
     }
 
-    async deleteRows(rowPosition: number, numRows?: number): Promise<void> {
+    async deleteRows(rowPosition: number, numRows: number = 1): Promise<void> {
         await this.queueRequest({
             orientation: this.orientation,
             deleteRows: {
-                position: rowPosition,
-                count: numRows,
+                start: rowPosition,
+                stop: rowPosition + numRows,
             },
         });
     }
 
-    async deleteColumns(columnPosition: number, numColumns?: number): Promise<void> {
+    async deleteColumns(columnPosition: number, numColumns: number = 1): Promise<void> {
         await this.queueRequest({
             orientation: this.orientation,
             deleteColumns: {
-                position: columnPosition,
-                count: numColumns,
+                start: columnPosition,
+                stop: columnPosition + numColumns,
             },
         });
     }
+}
+
+function range(start: number, stop: number) {
+    const arr = [];
+    for (let i = start; i < stop; i++) arr.push(i);
+    return arr;
 }

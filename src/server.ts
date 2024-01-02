@@ -38,12 +38,12 @@ export type SpreadsheetRequest = {
         count?: number
     },
     deleteRows?: {
-        position: number, 
-        count?: number
+        start: number, 
+        stop: number
     },
     deleteColumns?: {
-        position: number, 
-        count?: number
+        start: number, 
+        stop: number
     },
     writeData?: {
         colNumbers?: number[],
@@ -226,11 +226,11 @@ export class SpreadsheetServer {
             [deleteRows, deleteColumns] = [deleteColumns, deleteRows];
         }
         if (deleteRows) {
-            sheet.deleteRows(deleteRows.position, deleteRows.count);
+            sheet.deleteRows(deleteRows.start, deleteRows.stop - deleteRows.start);
             deletedRows = true;
         }
         if (deleteColumns) {
-            sheet.deleteColumns(deleteColumns.position, deleteColumns.count);
+            sheet.deleteColumns(deleteColumns.start, deleteColumns.stop - deleteColumns.start);
             deletedColumns = true;
         }
         if (req.orientation === 'transposed') {
@@ -284,12 +284,14 @@ export class SpreadsheetServer {
                     if (req.writeData.rows.length > writeRegion.rowStop - writeRegion.rowStart) {
                         req.writeData.rows.length = writeRegion.rowStop - writeRegion.rowStart;
                     }
-                    // ensure columns fit within region
-                    for (const row of req.writeData.rows) {
-                        row.length = colNumbers.length;
+                    // ensure columns fit within region & fix sparse `rows` arrays
+                    for (let i = 0; i < req.writeData.rows.length; i++) {
+                        if (req.writeData.rows[i]) 
+                            req.writeData.rows[i].length = colNumbers.length;
+                        else
+                            req.writeData.rows[i] = Array(colNumbers.length);
                     }
                     // write data
-                    // TODO: allow row array to be sparse
                     writeRegion.writeAll(req.writeData.rows);
                 } else {
                     // Pick out non-contiguous columns.
@@ -307,10 +309,9 @@ export class SpreadsheetServer {
                         req.writeData.rowStart + req.writeData.rows.length, min, max + 1);
                     const data = writeRegion.readAll();
                     // 2. overwrite with new data
-                    // TODO: allow row array to be sparse
                     for (let i = 0; i < data.length; i++) {
                         for (let j = 0; j < colNumbers.length; j++) {
-                            data[i][colNumbers[j] - min] = req.writeData.rows[i][j];
+                            data[i][colNumbers[j] - min] = req.writeData.rows[i]?.[j];
                         }
                     }
                     // 3. write data back to sheet
