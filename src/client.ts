@@ -172,7 +172,7 @@ export class SheetClient {
     ): SheetClient {
         const server = new SpreadsheetServer(sheet);
         return new SheetClient(
-            req => Promise.resolve(server.processRequest(req)),
+            req => Promise.resolve(server.processRequest({ orientation, ...req })),
             sheetName,
             undefined,
             orientation,
@@ -530,7 +530,6 @@ export class SheetClient {
 
     async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }> {
         return this.queueRequest({
-            orientation: this.orientation,
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             readHeaders: true,   // thus result.headers !== undefined (i.e., type cast below is ok)
             readData: 
@@ -542,7 +541,6 @@ export class SheetClient {
 
     async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Sendable[][], colNumbers: number[], rowOffset: number }> {
         const { data } = await this.queueRequest({
-            orientation: this.orientation,
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             readHeaders: false,
             readData: { rowStart, rowStop },
@@ -552,7 +550,6 @@ export class SheetClient {
 
     async writeRows(rowStart: number, rows: any[][]): Promise<void> {
         await this.queueRequest({
-            orientation: this.orientation,
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             writeData: { rowStart, rows },            
         });
@@ -560,7 +557,6 @@ export class SheetClient {
 
     async insertRows(rowPosition: number, numRows?: number): Promise<void> {
         await this.queueRequest({
-            orientation: this.orientation,
             insertRows: {
                 position: rowPosition,
                 count: numRows,
@@ -570,7 +566,6 @@ export class SheetClient {
 
     async insertColumns(columnPosition: number, numColumns?: number): Promise<void> {
         await this.queueRequest({
-            orientation: this.orientation,
             insertColumns: {
                 position: columnPosition,
                 count: numColumns,
@@ -580,7 +575,6 @@ export class SheetClient {
 
     async deleteRows(rowPosition: number, numRows: number = 1): Promise<void> {
         await this.queueRequest({
-            orientation: this.orientation,
             deleteRows: {
                 start: rowPosition,
                 stop: rowPosition + numRows,
@@ -590,12 +584,34 @@ export class SheetClient {
 
     async deleteColumns(columnPosition: number, numColumns: number = 1): Promise<void> {
         await this.queueRequest({
-            orientation: this.orientation,
             deleteColumns: {
                 start: columnPosition,
                 stop: columnPosition + numColumns,
             },
         });
+    }
+
+    async extend(rowStop?: number, colStop?: number): Promise<void> {
+        // No action is needed if either operand is undefined.
+        if (rowStop! > this.#rowStop!) {
+            await this.queueRequest({
+                insertRows: {
+                    position: this.#rowStop!,
+                    count: rowStop! - this.#rowStop!,
+                }
+            });
+            this.#rowStop = rowStop;
+        }
+        // No action is needed if either operand is undefined.
+        if (colStop! > this.#colStop!) {
+            await this.queueRequest({
+                insertColumns: {
+                    position: this.#colStop!,
+                    count: colStop! - this.#colStop!,
+                }
+            });
+            this.#colStop = colStop;
+        }
     }
 }
 

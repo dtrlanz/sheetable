@@ -84,6 +84,7 @@ export class Index<T extends object, V> {
         }
     }
 
+    // TODO: remove if unused
     /**
      * Sets the index ids for multiple rows of data
      * @param indexedProps — an iterable of tuples corresponding, each containing the indexed
@@ -102,14 +103,15 @@ export class Index<T extends object, V> {
      * @param idxValues — tuple of index values for a given record
      * @param initValue — callback that returns the value to be stored; will only be called if an
      *  element does not already exist for the indexed record
+     * @returns the value (newly initialized or already existing)
      */
     init(idxValues: any[], initValue: () => V) {
         // Stringify objects in the key. This may not be the ideal way to compare by value, but 
         // it's easy, predictable, and relatively efficient.
         idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
 
-        // Store row number
-        this.map.init(idxValues, initValue);
+        // Initialize value
+        return this.map.init(idxValues, initValue);
     }
 
     /**
@@ -123,7 +125,7 @@ export class Index<T extends object, V> {
         // it's easy, predictable, and relatively efficient.
         idxValues = idxValues.map(v => v && typeof v === 'object' ? JSON.stringify(v) : v);
 
-        // Store row number
+        // Store value
         this.map.set(idxValues, value);
     }
 

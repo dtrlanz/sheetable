@@ -86,3 +86,48 @@ test('create table', async t => {
     }
     t.is(await table.get({ a1: 0, a2: 0}, 0), undefined);
 });
+
+test('set', async t => {
+    class A {
+        @index
+        name: string;
+        age: number;
+        constructor(name: string, age: number) {
+            this.name = name;
+            this.age = age;
+        }
+    }
+    const data = [
+        new A('Amy', 24),
+        new A('Bob', 98),
+    ];
+    const table = await Table.create(data, { client: SheetClient.fromSheet(sheet``) });
+    function getCache() {
+        return table['slots'].map(s => s.cached);
+    }
+
+    t.deepEqual(getCache(), [
+        new A('Amy', 24),
+        new A('Bob', 98),
+    ], 'records from table creation should be present');
+
+    table.set(new A('Carly', 45));
+    table.set(new A('Dan', 62));
+
+    t.deepEqual(getCache(), [
+        new A('Amy', 24),
+        new A('Bob', 98),
+        new A('Carly', 45),
+        new A('Dan', 62),
+    ], 'new records should be added to the end');
+
+    table.set(new A('Amy', 25));
+    table.set(new A('Carly', 46));
+
+    t.deepEqual(getCache(), [
+        new A('Amy', 25),
+        new A('Bob', 98),
+        new A('Carly', 46),
+        new A('Dan', 62),
+    ], 'updated records should keep their positions');
+});

@@ -2,8 +2,8 @@ import { SheetLike } from "./sheet-navigation.js";
 import { Constructor } from "./meta-props.js";
 import { Orientation } from "./sheet-navigation.js";
 import { Value } from "./values.js";
-import { SheetClient } from "./client.js";
-import { Index } from "./index.js";
+import { SheetClient, SpreadsheetClient } from "./client.js";
+import { Index, getIndexKeys } from "./index.js";
 import { Header } from "./headers.js";
 import { getIndexTitles } from "./title.js";
 import { createFromEntries, createRecursively } from "./type.js";
@@ -32,6 +32,7 @@ export class Table<T extends object> {
     private readonly index: Index<T, Slot<T>>;
     private readonly header: Header<T>;
     private readonly slots: Slot<T>[] = [];
+    private rowStop: number = 0;
     
 
     private constructor(
@@ -50,7 +51,7 @@ export class Table<T extends object> {
 
     static async open<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>> {
         const client = options?.client ?? 
-            await SheetClient.fromUrl(options?.url, options?.sheetName, options?.orientation);
+            new SpreadsheetClient(options?.url).getSheet(options?.sheetName, options?.orientation);
 
         const { headers, data } = await client.get(getIndexTitles(ctor));
         if (!data) throw new Error('client failed to return index data');
@@ -79,6 +80,7 @@ export class Table<T extends object> {
             // increment `row` regardless of whether initialization takes place
             row++;
         }
+        table.rowStop = row;
 
         return table;
     }
@@ -87,7 +89,7 @@ export class Table<T extends object> {
     static async create<T extends object>(data: Iterable<T>, options?: TableOptions): Promise<Table<T>>;
     static async create<T extends object>(data: Constructor<T> | Iterable<T>, options?: TableOptions): Promise<Table<T>> {
         const client = options?.client ?? 
-            await SheetClient.fromUrl(options?.url, options?.sheetName, options?.orientation);
+            new SpreadsheetClient(options?.url).getSheet(options?.sheetName, options?.orientation);
 
         // Get constructor from sample data or use constructor to create sample data
         let ctor: Constructor<T>;
@@ -129,14 +131,15 @@ export class Table<T extends object> {
                     // increment `idx` only if element is actually initialized
                     idx: table.slots.length, 
                     row, 
-                    cached: obj 
+                    cached: table.toCached(obj) 
                 };
                 table.slots.push(slot);
+                // increment `row` only if element is actually initialized
+                row++;
                 return slot;
             });
-            // increment `row` regardless of whether initialization takes place
-            row++;
         }
+        table.rowStop = row;
         
         return table;
     }
@@ -157,7 +160,7 @@ export class Table<T extends object> {
         const obj = createRecursively(this.ctor, entries, this.context);
         if (Array.isArray(obj)) throw new Error(`unexpected array when constructing element #${idx}: ${obj}`);
         // cache for later
-        slot.cached = obj;
+        slot.cached = this.toCached(obj);
         return obj;
     }
 
@@ -170,5 +173,30 @@ export class Table<T extends object> {
         const idx = this.index.get(indexedValues)?.idx;
         if (idx === undefined) return undefined;
         return this.at(idx);
+    }
+
+    /**
+     * If a record with matching indexed properties exits, replaces that record with the new one.
+     * Otherwise adds a new record.
+     * @param value — the updated or added record
+     * @returns — the numeric index of the updated or added record
+     */
+    set(record: T): number {
+        const indexedValues = getIndexKeys(this.ctor, this.context).map(k => (record as any)[k]);
+
+        let slot = this.index.init(indexedValues, () => {
+            const slot = { 
+                idx: this.slots.length, 
+                row: this.rowStop++,
+            };
+            this.slots.push(slot);
+            return slot;
+        });
+        slot.cached = this.toCached(record);
+        return slot.idx;
+    }
+
+    private toCached<V extends T | undefined>(value: V ): V {
+        return value;
     }
 }
