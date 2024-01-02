@@ -95,9 +95,9 @@ export class Table<T extends object> {
         return table;
     }
 
-    static async create<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>>;
-    static async create<T extends object>(data: Iterable<T>, options?: TableOptions): Promise<Table<T>>;
-    static async create<T extends object>(data: Constructor<T> | Iterable<T>, options?: TableOptions): Promise<Table<T>> {
+    static create<T extends object>(ctor: Constructor<T>, options?: TableOptions): Table<T>;
+    static create<T extends object>(data: Iterable<T>, options?: TableOptions): Table<T>;
+    static create<T extends object>(data: Constructor<T> | Iterable<T>, options?: TableOptions): Table<T> {
         const client = options?.client ?? 
             new SpreadsheetClient(options?.url).getSheet(options?.sheetName, options?.orientation);
 

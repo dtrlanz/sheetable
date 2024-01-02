@@ -70,7 +70,7 @@ test('open table', async t => {
 
 test('create table', async t => {
     const data = [0, 1, 2, 3, 4, 5, 6].map(i => toObj(i * 10));
-    const table = await Table.create(data, { client: SheetClient.fromSheet(sheet``) });
+    const table = Table.create(data, { client: SheetClient.fromSheet(sheet``) });
     // retrieve nth item
     for (let i = 0; i < 7; i++) {
         t.deepEqual(await table.at(i), toObj(i * 10));
@@ -102,7 +102,7 @@ test('set', async t => {
         new A('Amy', 24),
         new A('Bob', 98),
     ];
-    const table = await Table.create(data, { client: SheetClient.fromSheet(sheet``) });
+    const table = Table.create(data, { client: SheetClient.fromSheet(sheet``) });
     function getCache() {
         return table['slots'].map(s => s.cached);
     }
@@ -149,7 +149,7 @@ test('save', async t => {
         new A('Amy', 24),
         new A('Bob', 98),
     ];
-    const table = await Table.create(data, { client });
+    const table = Table.create(data, { client });
     function getSavedValues() {
         return testSheet
             .getRange(1, 1, testSheet.getLastRow(), testSheet.getLastColumn())
@@ -194,7 +194,7 @@ test('save complex header', async t => {
     async function runTest(orientation: Orientation, expected: any[][]) {
         const testSheet = sheet``;
         const data = [0, 1, 2].map(i => toObj(i * 10));
-        const table = await Table.create(data, { 
+        const table = Table.create(data, { 
             client: SheetClient.fromSheet(testSheet, undefined, orientation)
         });
         await table.save();
