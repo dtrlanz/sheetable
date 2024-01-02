@@ -129,6 +129,24 @@ export class Header<T> {
         return this.columns[column - this.firstCol]?.keys;
     }
 
+    getHeaderRows(): string[][] {
+        const rows: string[][] = Array(this.#rowCount);
+        for (let rowIdx = 0; rowIdx < this.#rowCount; rowIdx++) {
+            rows[rowIdx] = Array(this.columns.length);
+        }
+        for (let colIdx = 0; colIdx < this.columns.length; colIdx++) {
+            for (let rowIdx = 0; rowIdx < this.#rowCount; rowIdx++) {
+                const title = this.columns[colIdx]?.titles[rowIdx] ?? '';
+                if (title !== this.columns[colIdx - 1]?.titles[rowIdx]) {
+                    rows[rowIdx][colIdx] = title;
+                } else {
+                    rows[rowIdx][colIdx] = '';
+                }
+            }
+        }
+        return rows;
+    }
+
     getRowValues(record: any): any[] {
         const arr = [];
         for (let i = 0; i < this.columns.length; i++) {

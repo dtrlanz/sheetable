@@ -37,6 +37,7 @@ export class Table<T extends object> {
     private readonly index: Index<T, Slot<T>>;
     private readonly header: Header<T>;
     private readonly slots: Slot<T>[] = [];
+    private saved: Promise<void> = Promise.resolve();
     private rowStop: number = 0;
     
 
@@ -131,9 +132,6 @@ export class Table<T extends object> {
             index,
         );
 
-        // Ensure enough space for width of header
-        await client.extend(undefined, header.firstCol + header.colCount);
-        
         // Initialize index
         let row = header.firstRow + header.rowCount;
         for (const [idxValues, obj] of index.getIndexedPropsFromObjects(data)) {
@@ -154,6 +152,15 @@ export class Table<T extends object> {
         }
         table.rowStop = row;
         
+        table.saved = (async () => {
+            // Ensure enough space for width of header and length of header + data
+            await client.extend(row, header.firstCol + header.colCount);
+            // Save headers
+            await table.saveHeaders();
+        })();
+        // Save data
+        table.save();
+
         return table;
     }
 
@@ -211,22 +218,33 @@ export class Table<T extends object> {
         return slot.idx;
     }
 
-    async save(): Promise<void> {
-        let arr: (T | undefined)[] | undefined;
-        let firstRow = 0;
-        for (const { row, changed, cached } of this.slots) {
-            if (!changed) {
-                arr?.push(undefined);
-            } else if (arr) {
-                arr.push(cached);
-            } else {
-                arr = [cached];
-                firstRow = row;
+    save(): Promise<void> {
+        // avoid racing write requests
+        this.saved = this.saved.then(async () => {
+            // collect data changed since last save
+            let arr: (T | undefined)[] | undefined;
+            let firstRow = 0;
+            for (const { row, changed, cached } of this.slots) {
+                if (!changed) {
+                    arr?.push(undefined);
+                } else if (arr) {
+                    arr.push(cached);
+                } else {
+                    arr = [cached];
+                    firstRow = row;
+                }
             }
-        }
-        if (!arr) return;
-        await this.client.extend(this.rowStop);
-        await this.client.writeRows(firstRow, arr.map(this.header.getRowValues));
+            // save to sheet
+            if (!arr) return;
+            await this.client.extend(this.rowStop);
+            await this.client.writeRows(firstRow, arr.map(this.header.getRowValues));
+        });
+        return this.saved;
+    }
+
+    private async saveHeaders(): Promise<void> {
+        const rows = this.header.getHeaderRows();
+        await this.client.writeRows(this.header.firstRow, rows);
     }
 
     private toCached<V extends T | undefined>(value: V ): V {

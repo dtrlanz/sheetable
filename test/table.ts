@@ -3,6 +3,7 @@ import { index } from "../src/index.js";
 import { SheetClient } from "../src/client.js";
 import { sheet } from "./util/sheet-navigation.js";
 import { Table } from '../src/table.js';
+import { Orientation } from '../src/sheet-navigation.js';
 
 const client = SheetClient.fromSheet(sheet`
     a  |    | b  | c  |     |     |     | d  | e   | f  |
@@ -132,7 +133,7 @@ test('set', async t => {
     ], 'updated records should keep their positions');
 });
 
-test.only('save', async t => {
+test('save', async t => {
     class A {
         @index
         name: string;
@@ -155,8 +156,8 @@ test.only('save', async t => {
             .getValues();
     }
 
-    const save = table.save();
-    await save;
+    await table.save();
+    await table['saveHeaders']();
 
     t.deepEqual(getSavedValues(), [
         ['name', 'age'],
@@ -188,3 +189,38 @@ test.only('save', async t => {
         ['Dan', 62],
     ], 'updated records should keep their positions');
 });
+
+test('save complex header', async t => {
+    async function runTest(orientation: Orientation, expected: any[][]) {
+        const testSheet = sheet``;
+        const data = [0, 1, 2].map(i => toObj(i * 10));
+        const table = await Table.create(data, { 
+            client: SheetClient.fromSheet(testSheet, undefined, orientation)
+        });
+        await table.save();
+        let numRows = 3, numCols = 10;
+        if (orientation === 'transposed') [numRows, numCols] = [numCols, numRows];
+        t.deepEqual(testSheet.getRange(1, 1, numRows, numCols).getValues(), expected,
+            `unexpected result in ${orientation} orientation`);
+    }
+
+    await runTest('normal', [
+        [ 'a',  '',   'b', 'c',  '',    '',    '',    'd', 'e',   'f'],
+        [ 'a1', 'a2', '',  'c1', 'c2',  '',    '',    '',  'e1',  ''],
+        [ '',   '',   '',  '',   'c21', 'c22', 'c23', '',  'e11', ''],
+    ]);
+
+    await runTest('transposed', [
+        ['a', 'a1', ''],
+        ['',  'a2', ''],
+        ['b', '',   ''],
+        ['c', 'c1', ''],
+        ['',  'c2', 'c21'],
+        ['',  '',   'c22'],
+        ['',  '',   'c23'],
+        ['d', '',   ''],
+        ['e', 'e1', 'e11'],
+        ['f', '',   ''],
+    ]);
+});
+

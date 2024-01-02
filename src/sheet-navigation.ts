@@ -151,7 +151,7 @@ export class Region {
 
 function transpose(data: any[][]): any[][] {
     const transposed = [];
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < data[0].length; i++) {
         transposed.push(data.map(col => col[i]));
     }
     return transposed;
