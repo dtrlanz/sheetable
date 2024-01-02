@@ -131,3 +131,60 @@ test('set', async t => {
         new A('Dan', 62),
     ], 'updated records should keep their positions');
 });
+
+test.only('save', async t => {
+    class A {
+        @index
+        name: string;
+        age: number;
+        constructor(name: string, age: number) {
+            this.name = name;
+            this.age = age;
+        }
+    }
+    const testSheet = sheet``;
+    const client = SheetClient.fromSheet(testSheet);
+    const data = [
+        new A('Amy', 24),
+        new A('Bob', 98),
+    ];
+    const table = await Table.create(data, { client });
+    function getSavedValues() {
+        return testSheet
+            .getRange(1, 1, testSheet.getLastRow(), testSheet.getLastColumn())
+            .getValues();
+    }
+
+    const save = table.save();
+    await save;
+
+    t.deepEqual(getSavedValues(), [
+        ['name', 'age'],
+        ['Amy',  24],
+        ['Bob',  98],
+    ], 'records from table creation should be present');
+
+    table.set(new A('Carly', 45));
+    table.set(new A('Dan', 62));
+    await table.save();
+
+    t.deepEqual(getSavedValues(), [
+        ['name', 'age'],
+        ['Amy',  24],
+        ['Bob',  98],
+        ['Carly', 45],
+        ['Dan', 62],
+    ], 'new records should be added to the end');
+
+    table.set(new A('Amy', 25));
+    table.set(new A('Carly', 46));
+    await table.save();
+
+    t.deepEqual(getSavedValues(), [
+        ['name', 'age'],
+        ['Amy',  25],
+        ['Bob',  98],
+        ['Carly', 46],
+        ['Dan', 62],
+    ], 'updated records should keep their positions');
+});

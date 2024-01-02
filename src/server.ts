@@ -275,10 +275,13 @@ export class SpreadsheetServer {
         }
 
         // *** Writing & reading data ***
-        const region = Region
-            .fromSheet(sheet, req.orientation)
-            .crop(req.limit?.rowStart, req.limit?.rowStop, 
-                req.limit?.colStart, req.limit?.colStop);
+        const region = new Region(
+            sheet, 
+            req.limit?.rowStart ?? 1,
+            req.limit?.rowStop ?? sheet.getLastRow() + 1,
+            req.limit?.colStart ?? 1,
+            req.limit?.colStop ?? sheet.getLastColumn() + 1,
+            req.orientation ?? 'normal');
 
         // Write before reading.
         wroteData = false;

@@ -13,6 +13,7 @@ export class Header<T> {
     get firstRow(): number { return this.#firstRow }
     get rowCount(): number { return this.#rowCount }
     get firstCol(): number { return this.#firstCol }
+    get colCount(): number { return this.columns.length }
 
     private constructor(
         ctor: Constructor<T>, 
@@ -27,6 +28,8 @@ export class Header<T> {
         this.#rowCount = columns.reduce((max, col) => Math.max(max, col?.titles.length ?? 0), 1);
         this.#firstCol = firstCol;
         this.columns = columns;
+
+        this.getRowValues = this.getRowValues.bind(this);
     }
 
     static create<T extends object>(
@@ -124,6 +127,22 @@ export class Header<T> {
 
     getKeyForColumns(column: number): (string | symbol | number)[] | undefined {
         return this.columns[column - this.firstCol]?.keys;
+    }
+
+    getRowValues(record: any): any[] {
+        const arr = [];
+        for (let i = 0; i < this.columns.length; i++) {
+            const keys = this.columns[i]?.keys;
+            if (!keys) continue;
+            arr[i] = getValue(record, keys);
+        }
+        return arr;
+        
+        function getValue(obj: any, keys: (string | number | symbol)[]) {
+            if (!keys.length) return obj;
+            if (!obj || typeof obj !== 'object') return undefined;
+            return getValue(obj[keys[0]], keys.slice(1));
+        }
     }
 }
 

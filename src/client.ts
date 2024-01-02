@@ -361,7 +361,7 @@ export class SheetClient {
 
         if (change === 'inserted' && dimension === 'rows') {
             // Update own boundaries to account for inserted rows.
-            if (this.#rowStart! >= position)
+            if (this.#rowStart! > position)
                 this.#rowStart! += count;
             if (this.#rowStop! >= position)
                 this.#rowStop! += count;
@@ -472,7 +472,7 @@ export class SheetClient {
         
         if (change === 'inserted' && dimension === 'columns') {
             // Update own boundaries to account for inserted rows.
-            if (this.#colStart! >= position)
+            if (this.#colStart! > position)
                 this.#colStart! += count;
             if (this.#colStop! >= position)
                 this.#colStop! += count;

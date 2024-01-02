@@ -23,7 +23,12 @@ type TableOptions = {
     sampleLimit?: number,
 };
 
-type Slot<T> = { idx: number, row: number, cached?: T };
+type Slot<T> = { 
+    idx: number, 
+    row: number, 
+    changed: boolean,
+    cached?: T,
+};
 
 export class Table<T extends object> {
     readonly ctor: Constructor<T>;
@@ -73,7 +78,11 @@ export class Table<T extends object> {
             // Note that initialization might be unsuccessful (in case of index collisions)
             index.init(idxValues, () => {
                 // increment `idx` only if element is actually initialized
-                const slot = { idx: table.slots.length, row };
+                const slot = { 
+                    idx: table.slots.length, 
+                    row, 
+                    changed: false 
+                };
                 table.slots.push(slot);
                 return slot;
             });
@@ -121,6 +130,9 @@ export class Table<T extends object> {
             header,
             index,
         );
+
+        // Ensure enough space for width of header
+        await client.extend(undefined, header.firstCol + header.colCount);
         
         // Initialize index
         let row = header.firstRow + header.rowCount;
@@ -131,6 +143,7 @@ export class Table<T extends object> {
                     // increment `idx` only if element is actually initialized
                     idx: table.slots.length, 
                     row, 
+                    changed: true,
                     cached: table.toCached(obj) 
                 };
                 table.slots.push(slot);
@@ -176,7 +189,7 @@ export class Table<T extends object> {
     }
 
     /**
-     * If a record with matching indexed properties exits, replaces that record with the new one.
+     * If a record with matching indexed properties exists, replaces that record with the new one.
      * Otherwise adds a new record.
      * @param value — the updated or added record
      * @returns — the numeric index of the updated or added record
@@ -188,12 +201,32 @@ export class Table<T extends object> {
             const slot = { 
                 idx: this.slots.length, 
                 row: this.rowStop++,
+                changed: true,
             };
             this.slots.push(slot);
             return slot;
         });
+        slot.changed = true,
         slot.cached = this.toCached(record);
         return slot.idx;
+    }
+
+    async save(): Promise<void> {
+        let arr: (T | undefined)[] | undefined;
+        let firstRow = 0;
+        for (const { row, changed, cached } of this.slots) {
+            if (!changed) {
+                arr?.push(undefined);
+            } else if (arr) {
+                arr.push(cached);
+            } else {
+                arr = [cached];
+                firstRow = row;
+            }
+        }
+        if (!arr) return;
+        await this.client.extend(this.rowStop);
+        await this.client.writeRows(firstRow, arr.map(this.header.getRowValues));
     }
 
     private toCached<V extends T | undefined>(value: V ): V {
