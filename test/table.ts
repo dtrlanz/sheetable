@@ -4,6 +4,7 @@ import { SheetClient } from "../src/client.js";
 import { sheet } from "./util/sheet-navigation.js";
 import { Table } from '../src/table.js';
 import { Orientation } from '../src/sheet-navigation.js';
+import { SpreadsheetServer } from '../src/server.js';
 
 const client = SheetClient.fromSheet(sheet`
     a  |    | b  | c  |     |     |     | d  | e   | f  |
@@ -157,7 +158,6 @@ test('save', async t => {
     }
 
     await table.save();
-    await table['saveHeaders']();
 
     t.deepEqual(getSavedValues(), [
         ['name', 'age'],
@@ -224,3 +224,49 @@ test('save complex header', async t => {
     ]);
 });
 
+test('save timeout', async t => {
+    const testSheet = sheet``;
+    const server = new SpreadsheetServer(testSheet);
+    // simulate 100ms delayed response
+    const client = new SheetClient(request => new Promise(resolve => {
+        setTimeout(() => resolve(server.processRequest(request)), 100);
+    }));
+
+    const data = [0, 1, 2].map(i => toObj(i * 10));
+    const table = Table.create(data, { client });
+
+    table.set(toObj(30));
+    await t.throwsAsync(() => table.save({ timeout: 10 }), undefined,
+        'timeout too small: request should fail');
+
+    table.set(toObj(40));
+    await t.notThrowsAsync(() => table.save({ timeout: 400 }), 
+        'timeout big enoug: request should succeed');
+});
+
+test('save retry', async t => {
+    const testSheet = sheet``;
+    const server = new SpreadsheetServer(testSheet);
+    // simulate failure of server request
+    let deny = 0;
+    const client = new SheetClient(request => new Promise((resolve, reject) => {
+        if (deny > 0) {
+            reject(new Error(`request will be denied ${deny--} time(s)`));
+        }
+        resolve(server.processRequest(request));
+    }));
+
+    const data = [0, 1, 2].map(i => toObj(i * 10));
+    const table = Table.create(data, { client });
+    await table.save();
+
+    table.set(toObj(30));
+    deny = 3;
+    await t.throwsAsync(() => table.save({ retryLimit: 2 }), undefined,
+        'should fail: cannot try more than 3 times');
+
+    table.set(toObj(40));
+    deny = 2;
+    await t.notThrowsAsync(() => table.save({ timeout: 1000, retryLimit: 2 }),
+        'should succeed on 3rd try');
+});

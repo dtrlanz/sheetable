@@ -26,7 +26,7 @@ type TableOptions = {
 type Slot<T> = { 
     idx: number, 
     row: number, 
-    changed: boolean,
+    changed: number,
     cached?: T,
 };
 
@@ -37,8 +37,14 @@ export class Table<T extends object> {
     private readonly index: Index<T, Slot<T>>;
     private readonly header: Header<T>;
     private readonly slots: Slot<T>[] = [];
-    private saved: Promise<void> = Promise.resolve();
+    private readonly changes = {
+        saveInProgress: undefined as Promise<void> | undefined,
+        saved: 0,
+        current: 1,
+    };
     private rowStop: number = 0;
+    #lastSaved?: Date;
+    get lastSaved() { return this.#lastSaved }
     
 
     private constructor(
@@ -82,7 +88,7 @@ export class Table<T extends object> {
                 const slot = { 
                     idx: table.slots.length, 
                     row, 
-                    changed: false 
+                    changed: table.changes.current 
                 };
                 table.slots.push(slot);
                 return slot;
@@ -141,7 +147,7 @@ export class Table<T extends object> {
                     // increment `idx` only if element is actually initialized
                     idx: table.slots.length, 
                     row, 
-                    changed: true,
+                    changed: table.changes.current,
                     cached: table.toCached(obj) 
                 };
                 table.slots.push(slot);
@@ -152,11 +158,16 @@ export class Table<T extends object> {
         }
         table.rowStop = row;
         
-        table.saved = (async () => {
-            // Ensure enough space for width of header and length of header + data
-            await client.extend(row, header.firstCol + header.colCount);
-            // Save headers
-            await table.saveHeaders();
+        table.changes.saveInProgress = (async () => {
+            try {
+                // Ensure enough space for width of header and length of header + data
+                await client.extend(row, header.firstCol + header.colCount);
+                // Save headers
+                await table.saveHeaders();
+            } catch (_) {
+            } finally {
+                table.changes.saveInProgress = undefined;
+            }
         })();
         // Save data
         table.save();
@@ -208,44 +219,84 @@ export class Table<T extends object> {
             const slot = { 
                 idx: this.slots.length, 
                 row: this.rowStop++,
-                changed: true,
+                changed: this.changes.current,
             };
             this.slots.push(slot);
             return slot;
         });
-        slot.changed = true;
+        slot.changed = this.changes.current;
         slot.cached = this.toCached(record);
         return slot.idx;
     }
 
-    save(): Promise<void> {
-        // avoid racing write requests
-        this.saved = this.saved.then(async () => {
-            // collect data changed since last save
-            let arr: (T | undefined)[] | undefined;
-            let firstRow = 0, lastRow = 0;
-            for (const s of this.slots) {
-                if (!s.changed) {
-                    arr?.push(undefined);
-                } else if (arr) {
-                    arr.push(s.cached);
-                    s.changed = false;
-                    lastRow = s.row;
-                } else {
-                    arr = [s.cached];
-                    s.changed = false;
-                    firstRow = lastRow = s.row;
+    async save({ timeout = 30000, retryLimit = 1 }: {
+        timeout?: number,
+        retryLimit?: number,
+    } = {}) {
+        const milestone = this.changes.current;
+        // Avoid racing several write requests simultaneously. Wait for previous request to
+        // succeed or fail.
+        try {
+            await this.changes.saveInProgress;
+        } catch (_) {}
+
+        // Race new save request against timeout.
+        this.changes.saveInProgress = Promise.race([
+            (async () => {
+                // Only proceed if still necessary. A concurrent method call might have saved in
+                // the meantime.
+                if (this.changes.saved < milestone) {
+                    await this._save();
                 }
+            })(),
+            new Promise<void>((_, reject) => setTimeout(
+                () => reject(new Error('Error saving table: request timeout reached')),
+                timeout
+            )),
+        ]);
+
+        try {
+            // Await save request or timeout
+            await this.changes.saveInProgress;
+        } catch (error) {
+            // Retry specified number of times
+            if (retryLimit >= 1) {
+                await this.save({ timeout, retryLimit: retryLimit - 1 });
+            } else {
+                throw error;
             }
-            // save to sheet
-            if (!arr) return;
-            await this.client.extend(this.rowStop);
-            await this.client.writeRows(firstRow, 
-                arr.slice(0, lastRow - firstRow + 1)
-                .map(r => r ? this.header.getRowValues(r) : undefined)
-            );
-        });
-        return this.saved;
+        }
+    }
+
+    private async _save() {
+        // Ensure data can fit in table
+        await this.client.extend(this.rowStop);
+        // Collect data changed since last successful save
+        let arr: (T | undefined)[] | undefined;
+        let firstRow = 0, lastRow = 0;
+        this.changes.current++;
+        const timeLastSaved = new Date();
+        for (const s of this.slots) {
+            if (s.changed <= this.changes.saved) {
+                arr?.push(undefined);
+            } else if (arr) {
+                arr.push(s.cached);
+                lastRow = s.row;
+            } else {
+                arr = [s.cached];
+                firstRow = lastRow = s.row;
+            }
+        }
+        // Save to sheet
+        if (!arr) return;
+        await this.client.writeRows(firstRow, 
+            arr.slice(0, lastRow - firstRow + 1)
+            .map(r => r ? this.header.getRowValues(r) : undefined)
+        );
+        // Update status
+        this.changes.saved = this.changes.current;
+        this.changes.current++;
+        this.#lastSaved = timeLastSaved;
     }
 
     private async saveHeaders(): Promise<void> {
