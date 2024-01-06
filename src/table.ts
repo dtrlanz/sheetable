@@ -229,7 +229,8 @@ export class Table<T extends object> {
         return slot.idx;
     }
 
-    async save({ timeout = 30000, retryLimit = 1 }: {
+    async save({ changesOnly = true, timeout = 30000, retryLimit = 1 }: {
+        changesOnly?: boolean,
         timeout?: number,
         retryLimit?: number,
     } = {}) {
@@ -246,7 +247,7 @@ export class Table<T extends object> {
                 // Only proceed if still necessary. A concurrent method call might have saved in
                 // the meantime.
                 if (this.changes.saved < milestone) {
-                    await this._save();
+                    await this._save(changesOnly);
                 }
             })(),
             new Promise<void>((_, reject) => setTimeout(
@@ -268,7 +269,7 @@ export class Table<T extends object> {
         }
     }
 
-    private async _save() {
+    private async _save(changesOnly: boolean) {
         // Ensure data can fit in table
         await this.client.extend(this.rowStop);
         // Collect data changed since last successful save
@@ -277,7 +278,7 @@ export class Table<T extends object> {
         this.changes.current++;
         const timeLastSaved = new Date();
         for (const s of this.slots) {
-            if (s.changed <= this.changes.saved) {
+            if (changesOnly && s.changed <= this.changes.saved) {
                 arr?.push(undefined);
             } else if (arr) {
                 arr.push(s.cached);

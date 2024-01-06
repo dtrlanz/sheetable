@@ -270,3 +270,31 @@ test('save retry', async t => {
     await t.notThrowsAsync(() => table.save({ timeout: 1000, retryLimit: 2 }),
         'should succeed on 3rd try');
 });
+
+test('save changes only', async t => {
+    const testSheet = sheet``;
+    const server = new SpreadsheetServer(testSheet);
+    // simulate failure of server request
+    let writeLength = 0;
+    const client = new SheetClient(request => new Promise((resolve, reject) => {
+        writeLength = request.writeData?.rows.length ?? 0;
+        resolve(server.processRequest(request));
+    }));
+
+    const data = [0, 1, 2].map(i => toObj(i * 10));
+    const table = Table.create(data, { client });
+
+    await table.save();
+    t.is(writeLength, 3, 'should write all 3 initial records');
+
+    table.set(toObj(30));
+    await table.save({ changesOnly: true });
+    t.is(writeLength, 1, 'should write only 1 (new) record');
+
+    await table.save({ changesOnly: false });
+    t.is(writeLength, 4, 'should write all 4 records');
+
+    writeLength = 0;
+    await table.save({ changesOnly: true });
+    t.is(writeLength, 0, 'should not write any records as none were changed');
+});
