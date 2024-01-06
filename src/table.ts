@@ -1,12 +1,12 @@
 import { SheetLike } from "./sheet-navigation.js";
 import { Constructor } from "./meta-props.js";
 import { Orientation } from "./sheet-navigation.js";
-import { Value } from "./values.js";
 import { SheetClient, SpreadsheetClient } from "./client.js";
 import { Index, getIndexKeys } from "./index.js";
 import { Header } from "./headers.js";
 import { getIndexTitles } from "./title.js";
 import { createFromEntries, createRecursively } from "./type.js";
+import { fromSendable } from "./values.js";
 
 type TableOptions = {
     context?: { readonly [k: string]: any },
@@ -81,7 +81,7 @@ export class Table<T extends object> {
 
         // Initialize index
         let row = data.rowOffset;
-        for (const idxValues of index.getIndexedPropsFromRows(data.rows, data.colNumbers)) {
+        for (const idxValues of index.getIndexedPropsFromRows(fromSendable(data.rows), data.colNumbers)) {
             // Note that initialization might be unsuccessful (in case of index collisions)
             index.init(idxValues, () => {
                 // increment `idx` only if element is actually initialized

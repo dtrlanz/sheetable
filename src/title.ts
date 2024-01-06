@@ -1,7 +1,7 @@
 import { getIndexKeys } from "./index.js";
 import { MetaProperty, Constructor } from "./meta-props.js";
 import { createFromEntries, getPropConstructor } from "./type.js";
-import { isComplex } from "./values.js";
+import { isScalar } from "./values.js";
 
 const titleProp = new MetaProperty<string | string[]>('title');
 const spreadProp = new MetaProperty<boolean>('spread');
@@ -42,7 +42,7 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
         // and none of the other properties are decorated with @rest.
         if (!(key in sample || (includeRest && restKey === undefined))) continue;
 
-        if (isComplex(value)) {
+        if (!isScalar(value)) {
             // Complex types (i.e., objects incl. arrays)
             if (typeof value === 'function') {
                 // functions not supported
@@ -55,7 +55,7 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
                     if (Array.isArray(title)) {
                         // Process arrays item by item
                         for (let i = 0; i < title.length && i < value.length; i++) {
-                            if (isComplex(value[i])) {
+                            if (!isScalar(value[i])) {
                                 // Get keys & titles of nested object recursively
                                 for (const [keyTail, titleTail] of getKeysWithTitles(value[i], context)) {
                                     arr.push([[key, i, ...keyTail], [title[i], ...titleTail]]);
@@ -96,7 +96,7 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
                 if (Array.isArray(value)) {
                     // Process arrays item by item
                     for (let i = 0; i < value.length; i++) {
-                        if (isComplex(value[i])) {
+                        if (!isScalar(value[i])) {
                             // Get keys & titles of nested object recursively
                             for (const [keyTail, titleTail] of getKeysWithTitles(value[i], context)) {
                                 arr.push([[key, i, ...keyTail], [title, `${i}`, ...titleTail]]);
@@ -118,12 +118,12 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
             // Non-complex types (i.e., primitive types & Date)
             if (toBeSpread.has(key)) {
                 // @spread decorator would cause re-import to ignore title
-                throw new Error(`@spread cannot be applied to scalar value: { ${String(key)}: ${value} }`);
+                throw new Error(`@spread cannot be applied to scalar value: { ${String(key)}: ${String(value)} }`);
             }
             if (restKey === key) {
                 // @rest decorator without @spread is ignored
                 // would not cause re-import to fail, so a warning is sufficient here
-                console.warn(`@rest decorator is ignored unless accompanied by @spread: { ${String(key)}: ${value} }`);
+                console.warn(`@rest decorator is ignored unless accompanied by @spread: { ${String(key)}: ${String(value)} }`);
             } 
             if (Array.isArray(title)) {
                 // non-initial titles are ignored without @spread

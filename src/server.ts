@@ -1,6 +1,6 @@
 import { SheetLike, Orientation, Region, TableWalker } from "./sheet-navigation.js";
 import { Branch, getHeadersHelper } from "./headers.js";
-import { Sendable } from "./values.js";
+import { Scalar, Sendable, fromSendable, toSendable } from "./values.js";
 
 type Spreadsheet = GoogleAppsScript.Spreadsheet.Spreadsheet;
 
@@ -56,6 +56,7 @@ export type SpreadsheetRequest = {
         rowStart: number,
         rows: (Sendable[] | undefined)[],
     },
+    skipConversion?: boolean,
 };
 
 export type SpreadsheetResponse = {
@@ -286,9 +287,12 @@ export class SpreadsheetServer {
         // Write before reading.
         wroteData = false;
         if (req.writeData) {
+            const rows = req.skipConversion 
+                ? req.writeData.rows as (Scalar[] | undefined)[]
+                : fromSendable(req.writeData.rows);
             const colNumbers = (req.writeData.colNumbers ??
                 // default to all columns in the given range (or as much as there is data)
-                intRange(region.colStart, region.colStart + (req.writeData.rows[0]?.length ?? 0)))
+                intRange(region.colStart, region.colStart + (rows[0]?.length ?? 0)))
                 // ensure column numbers are within region
                 .filter(v => v >= region.colStart && v < region.colStop);
 
@@ -297,24 +301,24 @@ export class SpreadsheetServer {
                 if (colRange) {
                     // Optimize for contiguous columns (probably more common).
                     const writeRegion = region.crop(
-                        req.writeData.rowStart, req.writeData.rowStart + req.writeData.rows.length, 
+                        req.writeData.rowStart, req.writeData.rowStart + rows.length, 
                         colRange.start, colRange.stop
                     );
                     // ensure rows fit within region
                     if (req.writeData.rowStart < writeRegion.rowStart) {
-                        req.writeData.rows.splice(0, writeRegion.rowStart - req.writeData.rowStart);
+                        rows.splice(0, writeRegion.rowStart - req.writeData.rowStart);
                     }
-                    if (req.writeData.rows.length > writeRegion.rowStop - writeRegion.rowStart) {
-                        req.writeData.rows.length = writeRegion.rowStop - writeRegion.rowStart;
+                    if (rows.length > writeRegion.rowStop - writeRegion.rowStart) {
+                        rows.length = writeRegion.rowStop - writeRegion.rowStart;
                     }
                     // only write rows with data
                     let section = [];
                     let start = 0;
-                    for (let i = 0; i < req.writeData.rows.length + 1; i++) {
-                        if (req.writeData.rows[i]) {
+                    for (let i = 0; i < rows.length + 1; i++) {
+                        if (rows[i]) {
                             // ensure columns fit within region
-                            req.writeData.rows[i]!.length = colNumbers.length;
-                            section.push(req.writeData.rows[i] as any[][]);
+                            rows[i]!.length = colNumbers.length;
+                            section.push(rows[i] as Scalar[]);
                         } else {
                             if (i > start) {
                                 // write data
@@ -340,13 +344,13 @@ export class SpreadsheetServer {
                     const min = colNumbers.reduce((a, b) => a < b ? a : b);
                     const max = colNumbers.reduce((a, b) => a > b ? a : b);
                     const writeRegion = region.crop(req.writeData.rowStart, 
-                        req.writeData.rowStart + req.writeData.rows.length, min, max + 1);
+                        req.writeData.rowStart + rows.length, min, max + 1);
                     const data = writeRegion.readAll();
                     // 2. overwrite with new data
                     for (let i = 0; i < data.length; i++) {
-                        if (!req.writeData.rows[i]) continue;
+                        if (!rows[i]) continue;
                         for (let j = 0; j < colNumbers.length; j++) {
-                            data[i][colNumbers[j] - min] = req.writeData.rows[i]?.[j];
+                            data[i][colNumbers[j] - min] = rows[i]?.[j];
                         }
                     }
                     // 3. write data back to sheet
@@ -385,8 +389,11 @@ export class SpreadsheetServer {
 
             if (req.readData === true || (!req.readData.colNumbers && !req.readData.colHeaders)) {
                 // include all columns
+                const rows = req.skipConversion 
+                    ? dataRegion.readAll() as Sendable[][]
+                    : toSendable(dataRegion.readAll());
                 data = {
-                    rows: dataRegion.readAll(),
+                    rows,
                     colNumbers: intRange(dataRegion.colStart, dataRegion.colStop),
                     rowOffset: dataRegion.rowStart,
                 };
@@ -411,19 +418,23 @@ export class SpreadsheetServer {
                 if (colRange) {
                     // optimize for contiguous columns (more common)
                     dataRegion = dataRegion.crop(undefined, undefined, colRange.start, colRange.stop);
+                    const rows = req.skipConversion 
+                        ? dataRegion.readAll() as Sendable[][]
+                        : toSendable(dataRegion.readAll());
                     data = {
-                        rows: dataRegion.readAll(),
+                        rows,
                         colNumbers: intRange(dataRegion.colStart, dataRegion.colStop),
                         rowOffset: dataRegion.rowStart,
                     };
                 } else {
                     // pick out non-contiguous columns (less common)
                     const colOffset = dataRegion.colStart;
+                    const rows = dataRegion.readAll()
+                        .map(row => colNumbers!.map(n => row[n - colOffset]));
                     data = {
-                        rows: dataRegion.readAll().map(
-                            row => colNumbers!.map(
-                                n => row[n - colOffset]
-                        )),
+                        rows: req.skipConversion 
+                            ? rows as Sendable[][]
+                            : toSendable(rows),
                         colNumbers: colNumbers,
                         rowOffset: dataRegion.rowStart,
                     };

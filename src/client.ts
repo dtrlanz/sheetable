@@ -1,6 +1,6 @@
 import { SheetLike, Orientation, Region, TableWalker } from "./sheet-navigation.js";
 import { Branch } from "./headers.js";
-import { Sendable } from "./values.js";
+import { Scalar, Sendable, fromSendable, toSendable } from "./values.js";
 import { SpreadsheetServer, SpreadsheetRequest, SpreadsheetResponse } from "./server.js";
 
 export class SpreadsheetClient {
@@ -53,7 +53,10 @@ export class SpreadsheetClient {
     ): SheetClient {
         const { sheetName, sheetId } = getSheetArg(sheet);
         return new SheetClient(
-            request => this.request({ sheetName, sheetId, ...request }),
+            request => {
+                console.log({ sheetName, sheetId, ...request });
+                return this.request({ sheetName, sheetId, ...request });
+            },
             sheetName,
             sheetId,
             orientation,
@@ -529,6 +532,9 @@ export class SheetClient {
         }
     }
 
+    // TODO: fix API for read methods
+    // - replace `getRows` with a method `readRows` that more closely mirrors `writeRows`
+    // - find some analogous solution for `get` (and rename to something less ambiguous)
     async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }> {
         return this.queueRequest({
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
@@ -540,19 +546,29 @@ export class SheetClient {
         }) as Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }>; 
     }
 
-    async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Sendable[][], colNumbers: number[], rowOffset: number }> {
+    async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Scalar[][], colNumbers: number[], rowOffset: number }> {
         const { data } = await this.queueRequest({
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             readHeaders: false,
             readData: { rowStart, rowStop },
         });
-        return data!;
+        return {
+            colNumbers: data!.colNumbers,
+            rowOffset: data!.rowOffset,
+            rows: fromSendable(data!.rows),
+        };;
     }
 
-    async writeRows(rowStart: number, rows: (any[] | undefined)[]): Promise<void> {
+    async writeRows(rowStart: number, rows: (Scalar[] | undefined)[]): Promise<void> {
+        const rowStop = this.rowStop ?? rowStart + rows.length;
+        let colStop = this.colStop;
+        if (!colStop) {
+            const width = rows.reduce((max, cur) => Math.max(max, cur?.length ?? 0), 0);
+            colStop = this.colStart + width;
+        }
         await this.queueRequest({
-            limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
-            writeData: { rowStart, rows },            
+            limit: { rowStart: this.rowStart, rowStop, colStart: this.colStart, colStop },
+            writeData: { rowStart, rows: toSendable(rows) },            
         });
     }
 

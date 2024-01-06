@@ -2,7 +2,7 @@ import { Header } from "./headers.js";
 import { Constructor, MetaProperty } from "./meta-props.js";
 import { getIndexTitles } from "./title.js";
 import { flattenEntries } from "./type.js";
-import { Sendable } from "./values.js";
+import { Scalar } from "./values.js";
 
 const indexProp = new MetaProperty('index');
 export const index = indexProp.getDecorator(true);
@@ -53,7 +53,7 @@ export class Index<T extends object, V> {
      * @returns — an iterable of tuples corresponding the input rows, each one containing the
      *  indexed properties of the given record
      */
-    *getIndexedPropsFromRows(rows: Iterable<Sendable[]>, colNumbers: number[]): Iterable<any[]> {
+    *getIndexedPropsFromRows(rows: Iterable<Scalar[]>, colNumbers: number[]): Iterable<any[]> {
         // Identify the columns needed for the index and associate them with the corresponding
         // key tuples
         const entryStructure: [key: (string | symbol | number)[], colIdx: number][] = [];
@@ -87,12 +87,12 @@ export class Index<T extends object, V> {
     // TODO: remove if unused
     /**
      * Sets the index ids for multiple rows of data
-     * @param indexedProps — an iterable of tuples corresponding, each containing the indexed
+     * @param indexedProps — an iterable of tuples each containing the indexed
      *  properties of a record
      * @param initValue — callback that returns the value to be stored; will be called for 
      *  elements that do not already exist
      */
-    initAll(indexedProps: Iterable<Sendable[]>, initValue: () => V) {
+    initAll(indexedProps: Iterable<Scalar[]>, initValue: () => V) {
         for (const item of indexedProps) {
             this.init(item, initValue);
         }

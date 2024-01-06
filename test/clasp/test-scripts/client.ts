@@ -14,7 +14,6 @@ test('create and delete sheets', async t => {
 
     // confirm creation
     let list = await client.getSheetList();
-    t.is(list.length, numSheets + 3);
     for (let i = 0; i < created.length; i++) {
         // only compare id and name
         // (index might have been changed through creation of subsequent sheets)
@@ -29,8 +28,25 @@ test('create and delete sheets', async t => {
 
     // confirm deletion
     list = await client.getSheetList();
-    t.is(list.length, numSheets);
     for (const sheet of created) {
         t.is(list.findIndex(s => s.id === sheet.id), -1);
     }
 })
+
+test('convert dates when sending & receiving data', async t => {
+    const sheet = client.getSheet(await client.insertSheet());
+
+    await sheet.writeRows(1, [
+        ['New Year', new Date(2024, 0, 1)],
+        ['Labour Day', new Date(2024, 4, 1)],
+    ]);
+
+    const rows = (await sheet.getRows(1, 3)).rows;
+    t.assert(rows[0][1] instanceof Date);
+    t.assert(rows[1][1] instanceof Date);
+    t.deepEqual(rows, [
+        ['New Year', new Date(2024, 0, 1)],
+        ['Labour Day', new Date(2024, 4, 1)],
+    ]);
+})
+

@@ -1,3 +1,5 @@
+import { Scalar } from "./values";
+
 export type Orientation = 'normal' | 'transposed';
 
 export interface SheetLike {
@@ -13,10 +15,10 @@ export interface SheetLike {
 }
 
 export interface RangeLike {
-    getValue(): any;
-    getValues(): any[][];
-    setValue(value: number | string | boolean | Date): void;
-    setValues(values: (number | string | boolean | Date)[][]): void;
+    getValue(): Scalar;
+    getValues(): Scalar[][];
+    setValue(value: Scalar): void;
+    setValues(values: Scalar[][]): void;
 }
 
 export class Region {
@@ -64,7 +66,7 @@ export class Region {
         );
     }
 
-    read(row: number, col: number): any {
+    read(row: number, col: number): Scalar {
         if (row < this.rowStart || row >= this.rowStop || col < this.colStart || col >= this.colStop) 
             return undefined;
 
@@ -75,7 +77,7 @@ export class Region {
         }
     }
 
-    write(row: number, col: number, value: any) {
+    write(row: number, col: number, value: Scalar) {
         if (this.orientation === 'normal') {
             return this.sheet.getRange(row, col).setValue(value);
         } else {
@@ -83,7 +85,7 @@ export class Region {
         }
     }
 
-    readRow(row: number): any[] | undefined {
+    readRow(row: number): Scalar[] | undefined {
         if (row < this.rowStart || row >= this.rowStop)
             return undefined;
 
@@ -97,7 +99,7 @@ export class Region {
         }
     }
 
-    writeRow(row: number, data: any[], onEnd: 'skip' | 'insert' | 'encroach'): Region {
+    writeRow(row: number, data: Scalar[], onEnd: 'skip' | 'insert' | 'encroach'): Region {
         let r: Region | undefined;
         if (row >= this.rowStop) {
             if (onEnd === 'skip') return this;
@@ -124,7 +126,7 @@ export class Region {
         return r ?? this;
     }
 
-    readAll(): any[][] {
+    readAll(): Scalar[][] {
         if (this.orientation === 'normal') {
             return this.sheet.getRange(this.rowStart, this.colStart, 
                 this.rowStop - this.rowStart, this.colStop - this.colStart)
@@ -136,7 +138,7 @@ export class Region {
         }
     }
 
-    writeAll(data: any[][]) {
+    writeAll(data: Scalar[][]) {
         if (this.orientation === 'normal') {
             this.sheet.getRange(this.rowStart, this.colStart, 
                 this.rowStop - this.rowStart, this.colStop - this.colStart)
@@ -149,7 +151,7 @@ export class Region {
     }
 }
 
-function transpose(data: any[][]): any[][] {
+function transpose(data: Scalar[][]): Scalar[][] {
     const transposed = [];
     for (let i = 0; i < data[0].length; i++) {
         transposed.push(data.map(col => col[i]));
@@ -196,7 +198,7 @@ export class TableWalker {
         return undefined;
     }
 
-    find(rowDelta: number, colDelta: number, predicate: (v: any) => boolean): TableWalker | undefined {
+    find(rowDelta: number, colDelta: number, predicate: (v: Scalar) => boolean): TableWalker | undefined {
         let cur: TableWalker | undefined = this;
         while (cur) {
             if (predicate(cur.value)) return cur;
@@ -205,7 +207,7 @@ export class TableWalker {
         return undefined;
     }
 
-    findAll(rowDelta: number, colDelta: number, predicate: (v: any) => boolean): TableWalker[] {
+    findAll(rowDelta: number, colDelta: number, predicate: (v: Scalar) => boolean): TableWalker[] {
         const arr: TableWalker[] = [];
         let cur: TableWalker | undefined = this;
         while (cur) {
@@ -215,7 +217,7 @@ export class TableWalker {
         return arr;
     }
 
-    map<T>(rowDelta: number, colDelta: number, callback: (v: any) => T): T[] {
+    map<T>(rowDelta: number, colDelta: number, callback: (v: Scalar) => T): T[] {
         const arr: T[] = [];
         let cur: TableWalker | undefined = this;
         while (cur) {
