@@ -65,7 +65,7 @@ export class Table<T extends object> {
         const client = options?.client ?? 
             new SpreadsheetClient(options?.url).getSheet(options?.sheetName, options?.orientation);
 
-        const { headers, data } = await client.get(getIndexTitles(ctor));
+        const { headers, data } = await client.readTable(getIndexTitles(ctor));
         if (!data) throw new Error('client failed to return index data');
 
         // Create data structures for header, index, and table
@@ -81,7 +81,7 @@ export class Table<T extends object> {
 
         // Initialize index
         let row = data.rowOffset;
-        for (const idxValues of index.getIndexedPropsFromRows(fromSendable(data.rows), data.colNumbers)) {
+        for (const idxValues of index.getIndexedPropsFromRows(data.rows, data.colNumbers)) {
             // Note that initialization might be unsuccessful (in case of index collisions)
             index.init(idxValues, () => {
                 // increment `idx` only if element is actually initialized
@@ -181,10 +181,10 @@ export class Table<T extends object> {
         // return cached object if available
         if (slot.cached) return slot.cached;
         // otherwise construct object from row data
-        const { rows: [row], colNumbers } = await this.client.getRows(slot.row, slot.row + 1);
+        const [row] = await this.client.readRows(slot.row, slot.row + 1);
         const entries: [(string | symbol | number)[], any][] = [];
-        for (let colIdx = 0; colIdx < colNumbers.length; colIdx++) {
-            const keyTuple = this.header.getKeyForColumns(colNumbers[colIdx]);
+        for (let colIdx = 0; colIdx < row.length; colIdx++) {
+            const keyTuple = this.header.getKeyForColumns(this.header.firstCol + colIdx);
             if (!keyTuple) continue;
             entries.push([keyTuple, row[colIdx]]);
         }

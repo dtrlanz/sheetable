@@ -175,7 +175,16 @@ export class SheetClient {
     ): SheetClient {
         const server = new SpreadsheetServer(sheet);
         return new SheetClient(
-            req => Promise.resolve(server.processRequest({ orientation, ...req })),
+            req => new Promise(resolve => 
+                // Defer promise resolution to the next tick of the event loop. This guarantees 
+                // that a structural change requested immediately after another request does not
+                // interefere with the earlier request. For example, if one request reads column C
+                // and the next request deletes column C, all microtasks dependent on the first
+                // response are completed before the deletion event fires.
+                setTimeout(() => 
+                    resolve(server.processRequest({ orientation, ...req }))
+                )
+            ),
             sheetName,
             undefined,
             orientation,
@@ -532,31 +541,53 @@ export class SheetClient {
         }
     }
 
-    // TODO: fix API for read methods
-    // - replace `getRows` with a method `readRows` that more closely mirrors `writeRows`
-    // - find some analogous solution for `get` (and rename to something less ambiguous)
-    async get(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }> {
-        return this.queueRequest({
+    /**
+     * Reads the sheet as a table with table headers and column data.
+     * 
+     * This method is primarily useful for importing a table from a sheet because it allows 
+     * reading the header rows and importing specific columns (typically the indexed columns) in
+     * a single request.
+     * 
+     * @param columns - a string array of the top-level column titles indicating which columns
+     * are to be read, or 'all' or 'none'
+     * @returns Promise of an object with two properties, `headers` and `data` (the latter is only
+     * present when column data is requested)
+     */
+    async readTable(columns: 'all' | 'none' | string[]): Promise<{ headers: Branch[], data?: { rows: Scalar[][], colNumbers: number[], rowOffset: number } }> {
+        const { headers, data } = await this.queueRequest({
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             readHeaders: true,   // thus result.headers !== undefined (i.e., type cast below is ok)
             readData: 
                 columns == 'all' ? true : 
                 columns == 'none' ? false :
                 { colHeaders: columns },
-        }) as Promise<{ headers: Branch[], data: SpreadsheetResponse['data'] }>; 
+        });
+        return {
+            headers: headers!,
+            data: data ? {
+                rows: fromSendable(data.rows),
+                colNumbers: data.colNumbers,
+                rowOffset: data.rowOffset,
+            } : undefined,
+        };
     }
 
-    async getRows(rowStart?: number, rowStop?: number): Promise<{ rows: Scalar[][], colNumbers: number[], rowOffset: number }> {
+    /**
+     * Returns values of the specified rows.
+     * 
+     * @param rowStart - the position (i.e., 1-based index) of the first row to be read
+     * @param rowStop - the position of the row at which to stop, i.e., the row after the last row
+     * to be included
+     * @returns Promise<Scalar[][]> - 2-dimensional array of values
+     */
+    async readRows(rowStart?: number, rowStop?: number): Promise<Scalar[][]> {
         const { data } = await this.queueRequest({
             limit: { rowStart: this.rowStart, rowStop: this.rowStop, colStart: this.colStart, colStop: this.colStop },
             readHeaders: false,
             readData: { rowStart, rowStop },
         });
-        return {
-            colNumbers: data!.colNumbers,
-            rowOffset: data!.rowOffset,
-            rows: fromSendable(data!.rows),
-        };;
+        if (!data || !data.colNumbers.length) throw new Error('server did not return any data');
+        return fromSendable(data.rows);
     }
 
     async writeRows(rowStart: number, rows: (Scalar[] | undefined)[]): Promise<void> {

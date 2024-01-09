@@ -41,12 +41,14 @@ test('convert dates when sending & receiving data', async t => {
         ['Labour Day', new Date(2024, 4, 1)],
     ]);
 
-    const rows = (await sheet.getRows(1, 3)).rows;
+    const rows = (await sheet.readRows(1, 3));
     t.assert(rows[0][1] instanceof Date);
     t.assert(rows[1][1] instanceof Date);
     t.deepEqual(rows, [
         ['New Year', new Date(2024, 0, 1)],
         ['Labour Day', new Date(2024, 4, 1)],
     ]);
+
+    await client.deleteSheet(sheet.sheetName!);
 })
 

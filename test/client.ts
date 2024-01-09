@@ -45,44 +45,38 @@ function br(label: string, row: number, start: number, stop: number, ...children
 
 test('client get', async t => {
     const client = SheetClient.fromSheet(sample);
-    const { headers: headers0, data: data0 } = await client.get('none');
+    const { headers: headers0, data: data0 } = await client.readTable('none');
     t.deepEqual(headers0, expectedHeaders);
     t.is(data0, undefined);
 
-    const { headers: headers1, data: data1 } = await client.get('all');
+    const { headers: headers1, data: data1 } = await client.readTable('all');
     t.deepEqual(headers1, expectedHeaders);
     t.is(data1?.rowOffset, 4);
     t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 10).getValues());
     
-    const { headers: headers2, data: data2 } = await client.get(['A', 'B', 'C', 'D', 'E', 'F']);
+    const { headers: headers2, data: data2 } = await client.readTable(['A', 'B', 'C', 'D', 'E', 'F']);
     t.deepEqual(headers2, expectedHeaders);
     t.deepEqual(data2?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     t.deepEqual(data2?.rows, sample.getRange(4, 1, 7, 10).getValues());
 
-    const { headers: headers3, data: data3 } = await client.get(['A', 'C']);
+    const { headers: headers3, data: data3 } = await client.readTable(['A', 'C']);
     t.deepEqual(headers3, expectedHeaders);
     t.deepEqual(data3?.colNumbers, [1, 2, 4, 5, 6, 7]);
     t.deepEqual(data3?.rows, sample.getRange(4, 1, 7, 11).getValues()
         .map(row => [1, 2, 4, 5, 6, 7].map(n => row[n - 1])));
 });
 
-test('client get rows', async t => {
+test('client read rows', async t => {
     const client = SheetClient.fromSheet(sample);
-    const data0 = await client.getRows();
-    t.is(data0?.rowOffset, 1);
-    t.deepEqual(data0?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    t.deepEqual(data0?.rows, sample.getRange(1, 1, 10, 10).getValues());
+    const data0 = await client.readRows();
+    t.deepEqual(data0, sample.getRange(1, 1, 10, 10).getValues());
     
-    const data1 = await client.getRows(4, 11);
-    t.is(data1?.rowOffset, 4);
-    t.deepEqual(data1?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    t.deepEqual(data1?.rows, sample.getRange(4, 1, 7, 10).getValues());
+    const data1 = await client.readRows(4, 11);
+    t.deepEqual(data1, sample.getRange(4, 1, 7, 10).getValues());
 
-    const data = await client.getRows(7, 9);
-    t.is(data?.rowOffset, 7);
-    t.deepEqual(data?.colNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    t.deepEqual(data?.rows, sample.getRange(7, 1, 2, 10).getValues());
+    const data = await client.readRows(7, 9);
+    t.deepEqual(data, sample.getRange(7, 1, 2, 10).getValues());
 });
 
 test('client write row data', async t => {
@@ -313,14 +307,12 @@ test('update queued requests on row/column insertion/deletion (general)', async 
     client.addEventListener('structuralChange', (...args) => eventArgs.push(args));
 
     // Insert rows
-    const beforeInsertingRows = client.getRows(6, 7);
+    const beforeInsertingRows = client.readRows(6, 7);
     const insertRows = client.insertRows(5, 2);
-    const afterInsertingRows = client.getRows(6, 7);
-    t.deepEqual(await beforeInsertingRows, {
-        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        rowOffset: 6,
-    });
+    const afterInsertingRows = client.readRows(6, 7);
+    t.deepEqual(await beforeInsertingRows, [
+        [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    ]);
     await insertRows;
     // confirm that event fired
     t.deepEqual(eventArgs.at(-1), ['inserted', 'rows', 5, 2]);
@@ -330,21 +322,17 @@ test('update queued requests on row/column insertion/deletion (general)', async 
         rowStop: 9,     // originally 7
     });
     // confirm that the data retrieved is what was originally in row 6 (now row 8)
-    t.deepEqual(await afterInsertingRows, {
-        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        rowOffset: 8,
-    });
+    t.deepEqual(await afterInsertingRows, [
+        [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    ]);
 
     // Delete rows
-    const beforeDeletingRows = client.getRows(7, 8);
+    const beforeDeletingRows = client.readRows(7, 8);
     const deleteRows = client.deleteRows(5, 2);
-    const afterDeletingRows = client.getRows(7, 8);
-    t.deepEqual(await beforeDeletingRows, {
-        rows: [[10, 11, 12, 13, 14, 15, 16, 17, 18, 19]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        rowOffset: 7,
-    });
+    const afterDeletingRows = client.readRows(7, 8);
+    t.deepEqual(await beforeDeletingRows, [
+        [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    ]);
     await deleteRows;
     // confirm that event fired
     t.deepEqual(eventArgs.at(-1), ['deleted', 'rows', 5, 2]);
@@ -354,21 +342,17 @@ test('update queued requests on row/column insertion/deletion (general)', async 
         rowStop: 6,     // originally 8
     });
     // confirm that the data retrieved is what was originally in row 7 (now row 5)
-    t.deepEqual(await afterDeletingRows, {
-        rows: [[10, 11, 12, 13, 14, 15, 16, 17, 18, 19]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        rowOffset: 5,
-    });
+    t.deepEqual(await afterDeletingRows, [
+        [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    ]);
 
     // Insert columns
-    const beforeInsertingColumns = client.getRows(6, 7);
+    const beforeInsertingColumns = client.readRows(6, 7);
     const insertColumns = client.insertColumns(5, 2);
-    const afterInsertingColumns = client.getRows(6, 7);
-    t.deepEqual(await beforeInsertingColumns, {
-        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        rowOffset: 6,
-    });
+    const afterInsertingColumns = client.readRows(6, 7);
+    t.deepEqual(await beforeInsertingColumns, [
+        [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    ]);
     await insertColumns;
     // confirm that event fired
     t.deepEqual(eventArgs.at(-1), ['inserted', 'columns', 5, 2]);
@@ -380,21 +364,17 @@ test('update queued requests on row/column insertion/deletion (general)', async 
         colStop: 13,    // originally 11
     });
     // confirm that the data retrieved reflects the column insertion
-    t.deepEqual(await afterInsertingColumns, {
-        rows: [[20, 21, 22, 23, '', '', 24, 25, 26, 27, 28, 29]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        rowOffset: 6,
-    });
+    t.deepEqual(await afterInsertingColumns, [
+        [20, 21, 22, 23, '', '', 24, 25, 26, 27, 28, 29]
+    ]);
 
     // Delete columns
-    const beforeDeletingColumns = client.getRows(6, 7);
+    const beforeDeletingColumns = client.readRows(6, 7);
     const deleteColumns = client.deleteColumns(5, 2);
-    const afterDeletingColumns = client.getRows(6, 7);
-    t.deepEqual(await beforeDeletingColumns, {
-        rows: [[20, 21, 22, 23, '', '', 24, 25, 26, 27, 28, 29]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        rowOffset: 6,
-    });
+    const afterDeletingColumns = client.readRows(6, 7);
+    t.deepEqual(await beforeDeletingColumns, [
+        [20, 21, 22, 23, '', '', 24, 25, 26, 27, 28, 29]
+    ]);
     await deleteColumns;
     // confirm that event fired
     t.deepEqual(eventArgs.at(-1), ['deleted', 'columns', 5, 2]);
@@ -406,11 +386,9 @@ test('update queued requests on row/column insertion/deletion (general)', async 
         colStop: 11,    // originally 13
     });
     // confirm that the data retrieved reflects the column deletion
-    t.deepEqual(await afterDeletingColumns, {
-        rows: [[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]],
-        colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        rowOffset: 6,
-    });
+    t.deepEqual(await afterDeletingColumns, [
+        [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    ]);
 });
 
 test('update queued requests on row deletion (specific cases)', async t => {
@@ -442,15 +420,11 @@ test('update queued requests on row deletion (specific cases)', async t => {
     );
 
     await testCase(
-        client => client.getRows(5, 10),
-        ({ result }) => t.deepEqual(result, {
-            colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-            rows: [
-                [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row 5
-                [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],   // row 6 (old 9)
-            ],
-            rowOffset: 5,
-        }, 'read should return remaining rows'),
+        client => client.readRows(5, 10),
+        ({ result }) => t.deepEqual(result, [
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row 5
+            [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],   // row 6 (old 9)
+        ], 'read should return remaining rows'),
     );
 
     await testCase(
@@ -593,18 +567,14 @@ test('update queued requests on row insertion (specific cases)', async t => {
     );
 
     await testCase(
-        client => client.getRows(5, 8),
-        ({ result }) => t.deepEqual(result, {
-            colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-            rows: [
-                [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  5
-                ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
-                ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
-                [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
-                [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],   // row  9 (old  7)
-            ],
-            rowOffset: 5,
-        }, 'read should cover requested range but include inserted rows'),
+        client => client.readRows(5, 8),
+        ({ result }) => t.deepEqual(result, [
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],   // row  5
+            ['', '', '', '', '', '', '', '', '', ''],   // row  6 (new)
+            ['', '', '', '', '', '', '', '', '', ''],   // row  7 (new)
+            [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],   // row  8 (old  6)
+            [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],   // row  9 (old  7)
+        ], 'read should cover requested range but include inserted rows'),
     );
 
     await testCase(
@@ -739,16 +709,12 @@ test('update queued requests on column deletion (specific cases)', async t => {
     );
 
     await testCase(
-        client => client.getRows(5, 8),
-        ({ result }) => t.deepEqual(result, {
-            colNumbers: [1, 2, 3, 4, 5, 6, 7],
-            rows: [
-                [10, 11, 12, 13, 17, 18, 19],   // row 5
-                [20, 21, 22, 23, 27, 28, 29],   // row 6
-                [30, 31, 32, 33, 37, 38, 39],   // row 7
-                ],
-            rowOffset: 5,
-        }, 'read should proceed unaffected'),
+        client => client.readRows(5, 8),
+        ({ result }) => t.deepEqual(result, [
+            [10, 11, 12, 13, 17, 18, 19],   // row 5
+            [20, 21, 22, 23, 27, 28, 29],   // row 6
+            [30, 31, 32, 33, 37, 38, 39],   // row 7
+        ], 'read should proceed unaffected'),
     );
 
     await testCase(
@@ -879,15 +845,11 @@ test('update queued requests on column insertion (specific cases)', async t => {
     );
 
     await testCase(
-        client => client.getRows(4, 6),
-        ({ result }) => t.deepEqual(result, {
-            colNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-            rows: [
-                [ 0,  1,  2,  3,  4, '', '',  5,  6,  7,  8,  9],   // row 4
-                [10, 11, 12, 13, 14, '', '', 15, 16, 17, 18, 19],   // row 5
-            ],
-            rowOffset: 4,
-        }, 'read should proceed unaffected'),
+        client => client.readRows(4, 6),
+        ({ result }) => t.deepEqual(result, [
+            [ 0,  1,  2,  3,  4, '', '',  5,  6,  7,  8,  9],   // row 4
+            [10, 11, 12, 13, 14, '', '', 15, 16, 17, 18, 19],   // row 5
+        ], 'read should proceed unaffected'),
     );
 
     await testCase(
