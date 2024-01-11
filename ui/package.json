@@ -1,0 +1,14 @@
+{
+  "name": "@dtrlanz/sheetable-ui",
+  "version": "0.1.0",
+  "description": "Utility for reading & writing tables in Sheets using Google Apps Script",
+  "main": "dist/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "ava"
+  },
+  "author": "",
+  "license": "MIT"
+}

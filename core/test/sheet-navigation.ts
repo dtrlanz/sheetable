@@ -1,8 +1,8 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
 
-import { Branch, getHeadersHelper } from '../src/headers.js';
-import { Region, TableWalker } from "../src/sheet-navigation.js";
+import { Branch, getHeadersHelper } from '../lib/headers.js';
+import { Region, TableWalker } from "../lib/sheet-navigation.js";
 
 const region = Region.fromSheet(sheet`
     a | b | c | d

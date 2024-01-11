@@ -1,5 +1,5 @@
 import test from 'ava';
-import { MetaProperty } from "../src/meta-props.js";
+import { MetaProperty } from "../lib/meta-props.js";
 
 test('reading something not decorated', t => {
     class ClassA {}

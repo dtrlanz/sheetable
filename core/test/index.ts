@@ -1,9 +1,9 @@
 import test from 'ava';
-import { index, getIndexKeys, TupleMap, Index } from "../src/index.js";
-import { title, getIndexTitles } from "../src/title.js";
+import { index, getIndexKeys, TupleMap, Index } from "../lib/index.js";
+import { title, getIndexTitles } from "../lib/title.js";
 import { sheet } from './util/sheet-navigation.js';
-import { SheetClient } from '../src/client.js';
-import { Header } from '../src/headers.js';
+import { SheetClient } from '../lib/client.js';
+import { Header } from '../lib/headers.js';
 
 test('get keys and titles for simple index', t => {
     const sym = Symbol('sym');

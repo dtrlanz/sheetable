@@ -1,7 +1,7 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
-import { SpreadsheetServer } from "../src/server.js";
-import { Branch } from '../src/headers.js';
+import { SpreadsheetServer } from "../lib/server.js";
+import { Branch } from '../lib/headers.js';
 
 function getSampleSheet() {
     return sheet`

@@ -1,6 +1,7 @@
 node_modules/
 **/_*
 .clasp.json
+*/dist/**
 /out/**
 !/out/clasp
 !/out/clasp/appsscript.json

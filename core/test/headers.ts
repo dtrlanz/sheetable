@@ -1,9 +1,9 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
 
-import { Header, Branch, getHeadersHelper } from '../src/headers.js';
-import { Region, TableWalker } from "../src/sheet-navigation.js";
-import { title } from "../src/title.js";
+import { Header, Branch, getHeadersHelper } from '../lib/headers.js';
+import { Region, TableWalker } from "../lib/sheet-navigation.js";
+import { title } from "../lib/title.js";
 
 
 
