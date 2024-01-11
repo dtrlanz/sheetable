@@ -1,5 +1,20 @@
 {
+  "type": "module",
   "dependencies": {
-    "@types/google.script.client-side": "^0.1.1"
+    "htm": "^3.1.1"
+  },
+  "devDependencies": {
+    "@dtrlanz/gas-bundler": "^0.2.0",
+    "@types/google.script.client-side": "^0.1.5",
+    "ava": "^5.3.1"
+  },
+  "scripts": {
+    "test": "ava"
+  },
+  "ava": {
+    "files": [
+      "**/test/*",
+      "**/test/util/*test*"
+    ]
   }
 }

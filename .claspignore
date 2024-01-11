@@ -1,0 +1,3 @@
+# note that paths are relative to `rootDir` of .clasp.json
+# ignore out/tmp
+tmp/**

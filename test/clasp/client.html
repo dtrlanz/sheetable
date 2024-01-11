@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        h1 {
+            font-size: large;
+            cursor: pointer;
+        }
+        .collapsed div {
+            display: none;
+        }
+        .passed h1 {
+            color: green;
+        }
+        .failed h1 {
+            color: red;
+        }
+        .test div {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: medium;
+            border-left: 2px solid grey;
+            padding-left: 10px;
+        }
+        .result {
+            font-weight: bold;
+        }
+        .stack {
+            color: grey;
+            font-size: smaller;
+        }
+    </style>
+</head>
+<body>
+    <div id="tests"></div>
+    <script type="module">
+        const url = '<?= spreadsheet.url ?>';
+
+        import { display } from "./test";
+        display(document.getElementById('tests'));
+
+        //import "./test-scripts/types.ts";
+        //import "./test-scripts/sheet-navigation.ts";
+        import "./test-scripts/client.ts";
+    </script>
+</body>
+</html>
