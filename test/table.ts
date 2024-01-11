@@ -274,9 +274,8 @@ test('save retry', async t => {
 test('save changes only', async t => {
     const testSheet = sheet``;
     const server = new SpreadsheetServer(testSheet);
-    // simulate failure of server request
     let writeLength = 0;
-    const client = new SheetClient(request => new Promise((resolve, reject) => {
+    const client = new SheetClient(request => new Promise(resolve => {
         writeLength = request.writeData?.rows.length ?? 0;
         resolve(server.processRequest(request));
     }));
