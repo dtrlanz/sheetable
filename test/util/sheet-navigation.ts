@@ -1,4 +1,4 @@
-import { SheetLike, RangeLike } from "../../lib/sheet-navigation.js";
+import { SheetLike, RangeLike } from "../../src/sheet-navigation.js";
 
 export class TestSheet implements SheetLike {
     _rows: (number | string | boolean | Date)[][];

@@ -1,5 +1,5 @@
 import test from 'ava';
-import { title, spread, rest, getObjectPath, getKeysWithTitles } from "../lib/title.js";
+import { title, spread, rest, getObjectPath, getKeysWithTitles } from "../src/title.js";
 
 /**
  * Note: The current implementation relies on `Object.entries()` to find an object's properties.

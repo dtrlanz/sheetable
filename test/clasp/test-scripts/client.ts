@@ -1,5 +1,5 @@
 import { test } from "../test";
-import { SpreadsheetClient } from "../../../lib/client";
+import { SpreadsheetClient } from "../../../src/client";
 import { url } from "../_url";
 
 const client = new SpreadsheetClient(url);

@@ -1,6 +1,6 @@
 import test from 'ava';
-import { type, getPropConstructor, createFromEntries, createRecursively } from "../lib/type.js";
-import { title } from '../lib/title.js';
+import { type, getPropConstructor, createFromEntries, createRecursively } from "../src/type.js";
+import { title } from '../src/title.js';
 
 test('from entries', t => {
     // without static factory method

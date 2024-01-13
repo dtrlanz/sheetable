@@ -1,9 +1,8 @@
 {
   "type": "module",
-  "workspaces": [
-    "core",
-    "ui"
-  ],
+  "dependencies": {
+    "htm": "^3.1.1"
+  },
   "devDependencies": {
     "@dtrlanz/gas-bundler": "^0.2.0",
     "@types/google.script.client-side": "^0.1.5",

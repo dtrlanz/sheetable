@@ -1,8 +1,8 @@
 import test from 'ava';
 import { sheet } from "./util/sheet-navigation.js";
-import { Branch } from '../lib/headers.js';
-import { SheetClient, SheetEventParams } from '../lib/client.js';
-import { SheetLike } from '../lib/sheet-navigation.js';
+import { Branch } from '../src/headers.js';
+import { SheetClient, SheetEventParams } from '../src/client.js';
+import { SheetLike } from '../src/sheet-navigation.js';
 
 function getSampleSheet() {
     return sheet`

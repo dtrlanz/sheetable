@@ -1,24 +1,21 @@
 {
-  /* This tsconfig.json is for testing: compile all (local) tests in workspace */
-  "include": ["*/lib/*", "*/test/*", "*/test/*/*"],
-  "exclude": ["*/test/clasp"],
-  "compilerOptions": {
-    /* Visit https://aka.ms/tsconfig to read more about this file */
-    /* Language and Environment */
-    "target": "ES2022",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-    "lib": ["es2022", "esnext.decorators", "dom"],
-    "experimentalDecorators": false,
-    /* Modules */
-    "rootDir": ".",                                      /* Specify the root folder within your source files. */
-    "moduleResolution": "node",
-    /* Emit */
-    "outDir": "./out/node",                              /* Specify an output folder for all emitted files. */
-    /* Interop Constraints */
-    "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
-    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
-    /* Type Checking */
-    "strict": true,                                      /* Enable all strict type-checking options. */
-    /* Completeness */
-    "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
-  }
+    "compilerOptions": {
+      /* Visit https://aka.ms/tsconfig to read more about this file */
+      /* Language and Environment */
+      "target": "ES2022",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
+      "lib": ["es2022", "esnext.decorators", "dom"],
+      "experimentalDecorators": false,
+      /* Modules */
+      "rootDir": ".",                                      /* Specify the root folder within your source files. */
+      "moduleResolution": "node",
+      /* Emit */
+      "outDir": "./out/node",                              /* Specify an output folder for all emitted files. */
+      /* Interop Constraints */
+      "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
+      "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
+      /* Type Checking */
+      "strict": true,                                      /* Enable all strict type-checking options. */
+      /* Completeness */
+      "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
+    }
 }
