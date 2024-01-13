@@ -5,12 +5,29 @@
     "@types/google.script.client-side": "^0.1.5",
     "ava": "^5.3.1"
   },
+  "name": "@dtrlanz/sheetable",
+  "description": "Utility for reading & writing tables in Sheets using Google Apps Script",
+  "version": "0.1.0",
+  "main": "lib/package.js",
   "scripts": {
     "pretest": "tsc --project tests || exit 0",
     "test": "ava",
     "prepush": "cd tests/clasp/app & node build.js",
     "push": "cd tests/clasp/app & clasp push"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dtrlanz/sheetable.git"
+  },
+  "keywords": [
+    "apps-script"
+  ],
+  "author": "Daniel Lanz",
+  "license": "MIT",
+  "homepage": "https://github.com/dtrlanz/sheetable#readme",
+  "files": [
+    "/lib"
+  ],
   "ava": {
     "files": [
       "**/out/tests/*",
