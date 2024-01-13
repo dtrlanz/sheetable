@@ -1,6 +1,6 @@
-import { test } from "../test";
-import { SpreadsheetClient } from "../../../src/client";
-import { url } from "../_url";
+import { test } from "./app/test";
+import { SpreadsheetClient } from "../../src/client";
+import { url } from "./app/_url";
 
 const client = new SpreadsheetClient(url);
 

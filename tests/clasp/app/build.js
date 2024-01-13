@@ -1,15 +1,15 @@
 import { buildClient, buildServer } from "@dtrlanz/gas-bundler";
 
 buildServer({
-    entryPoints: ['test/clasp/server.ts'],
-    outdir: 'out/clasp',
+    entryPoints: ['server.ts'],
+    outdir: 'out',
     format: 'cjs',
     target: 'es2019',
 });
 
 buildClient({
-    entryPoints: ['test/clasp/client.html'],
-    outdir: 'out/clasp',
+    entryPoints: ['client.html'],
+    outdir: 'out',
     format: 'cjs',
     target: 'es2022',
 });

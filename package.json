@@ -1,20 +1,20 @@
 {
   "type": "module",
-  "dependencies": {
-    "htm": "^3.1.1"
-  },
   "devDependencies": {
     "@dtrlanz/gas-bundler": "^0.2.0",
     "@types/google.script.client-side": "^0.1.5",
     "ava": "^5.3.1"
   },
   "scripts": {
-    "test": "ava"
+    "pretest": "tsc --project tests || exit 0",
+    "test": "ava",
+    "prepush": "cd tests/clasp/app & node build.js",
+    "push": "cd tests/clasp/app & clasp push"
   },
   "ava": {
     "files": [
-      "**/test/*",
-      "**/test/util/*test*"
+      "**/out/tests/*",
+      "**/out/tests/util/*test*"
     ]
   }
 }

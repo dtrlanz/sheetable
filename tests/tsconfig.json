@@ -1,5 +1,6 @@
 {
-  "include": ["src/**/*"],
+  "include": ["../src/**/*", "./**/*"],
+  "exclude": ["clasp/"],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */
     /* Language and Environment */
@@ -7,10 +8,10 @@
     "lib": ["es2022", "esnext.decorators", "dom"],
     "experimentalDecorators": false,
     /* Modules */
-    "rootDir": "./src",                                      /* Specify the root folder within your source files. */
+    "rootDir": "..",                                      /* Specify the root folder within your source files. */
     "moduleResolution": "node",
     /* Emit */
-    "outDir": "./dist",                              /* Specify an output folder for all emitted files. */
+    "outDir": "./out",                              /* Specify an output folder for all emitted files. */
     /* Interop Constraints */
     "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
     "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */

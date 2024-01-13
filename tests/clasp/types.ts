@@ -1,6 +1,6 @@
-import { test } from "../test";
-import { SF } from "../server-fns";
-import { server as _server, TypedServer } from "../server-proxy";
+import { test } from "./app/test";
+import { SF } from "./app/server-fns";
+import { server as _server, TypedServer } from "./app/server-proxy";
 
 const server = _server as TypedServer<SF>;
 
