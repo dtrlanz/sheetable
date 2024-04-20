@@ -32,7 +32,7 @@ export function getPropType(obj: object | Constructor, key: string | symbol, con
         const o = createFromEntries(obj as Constructor, []);
         if (!o) return undefined;
         obj = o;
-    }
+    }    
 
     let val = (obj as any)[key];
     
@@ -44,7 +44,7 @@ export function getPropType(obj: object | Constructor, key: string | symbol, con
     }
 
     let valType: Type;
-    switch (typeof val[0]) {
+    switch (typeof val) {
         case 'object':
             valType = val ? Object.getPrototypeOf(val).constructor : undefined;
             break;
