@@ -1,5 +1,5 @@
-import { Constructor } from "./meta-props";
-import { getKeysWithTitles, title } from "./title";
+import { Constructor } from "./meta-props.js";
+import { getKeysWithTitles, title } from "./title.js";
 
 
 type Child = {
@@ -10,7 +10,7 @@ type Child = {
     elem: HTMLElement,
 };
 
-class Component<T extends object | object[] = any> {
+export class Component<T extends object | object[] = any> {
     ctor: Constructor<T>;
     data: T;
     id: string;
@@ -24,30 +24,35 @@ class Component<T extends object | object[] = any> {
     constructor(data: T, ctor?: Constructor<T>, context?: { [k: string]: any; }) {
         this.id = `${Component.idPrefix}${(Component.idIncr++).toString(16)}`;
         this.data = data;
-        let obj;
+        let sample;
         if (ctor) {
             this.ctor = ctor;
+            sample = Array.isArray(data)
+                ? (data[0] ?? new this.ctor())
+                : data;
         } else {
             if (Array.isArray(data)) {
                 if (!data.length) {
                     throw new Error('When passing an empty array, a constructor is required as the second argument.');
                 }
-                obj = data[0];
+                sample = data[0];
             } else {
-                obj = data;
+                sample = data;
             }
-            this.ctor = Object.getPrototypeOf(obj).constructor;
+            this.ctor = Object.getPrototypeOf(sample).constructor;
         }
-        let structure = getKeysWithTitles(this.ctor, context);
+        let structure = getKeysWithTitles(sample, context);
         if (Array.isArray(data)) {
             this.header = structure.map(([_, title]) => title);
+            const rowIds: string[] = [];
+            for (let i = 0; i < data.length; i++) {
+                rowIds.push((this.childIdIncr++).toString());
+            }
             structure = structure.flatMap(([key, title]) => {
-                const arr: typeof structure = new Array(data.length);
-                for (let i = 0; i < data.length; i++) {
-                    arr[i] = [[i, ...key], [(this.childIdIncr++).toString(), ...title]];
-                }
-                return arr;
-            })
+                return rowIds.map((rowId, idx) =>
+                    [[idx, ...key], [rowId, ...title]]
+                ) satisfies typeof structure;
+            });
         }
         this.children = constructChildren(this, this.id, structure);
     }
@@ -117,7 +122,6 @@ class UiGroup {
     deepMap<T>(mapFieldFn: (field: UiField) => T, mapGroupFn: (items: T[], group: UiGroup) => T): T {
         return mapGroupFn(this.children.map(item => item.deepMap(mapFieldFn, mapGroupFn)), this);
     }
-
 }
 
 class UiField {
@@ -150,7 +154,6 @@ class UiField {
         }
         return this.#label;
     }
-
 }
 
 
