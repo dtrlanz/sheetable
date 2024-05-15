@@ -1,6 +1,9 @@
 import test from 'ava';
+import { JSDOM } from 'jsdom';
+
 import { title, spread, rest, getKeysWithTitles } from "../src/title.js";
 import { Component } from "../src/component.js";
+
 
 type UiStructure = ({
     title: string;
@@ -185,4 +188,73 @@ test('array of objects', t => {
         ['Oranges'],
     ]);
 
+});
+
+function html2object(html: HTMLElement) {
+    const obj: any = {
+        tag: html.tagName.toLowerCase() as any,
+        children: [],
+    };
+    // const attrMap = html.attributes;
+    // for (let i = 0; i < attrMap.length; i++) {
+    //     const attr = attrMap.item(i);
+    //     if (attr) obj[attr.name] = attr.value;
+    // }
+    for (const child of html.childNodes) {
+        if (child.nodeType === 1 /* Node.ELEMENT_NODE */) {
+            obj.children.push(html2object(child as HTMLElement))
+        } else if (child.nodeType === 3 /* Node.TEXT_NODE */) {
+            obj.children.push(child.textContent)
+        }
+    }
+    return obj;
+}
+
+test.only('simple UI component', t => {
+    const dom = new JSDOM('');
+    global.document = dom.window.document;
+
+    class A {
+        @title('Foo')
+        foo = 3.14;
+
+        @title('Bar')
+        bar = false;
+    }
+
+    class B {
+        @title('Apples')
+        a = new A();
+
+        @title('Oranges')
+        b = 42;
+    }
+
+    const obj = new B();
+    const comp = new Component(obj);
+    t.deepEqual(html2object(comp.html), {
+        tag: 'div',
+        children: [{
+            tag: 'div',
+            children: [{
+                tag: 'label',
+                children: ['Foo'],
+            }, {
+                tag: 'input',
+                children: [],
+            }, {
+                tag: 'label',
+                children: ['Bar'],
+            }, {
+                tag: 'input',
+                children: [],
+            }]
+        }, {
+            tag: 'label',
+            children: ['Oranges'],
+        }, {
+            tag: 'input',
+            children: [],
+        }],
+    });
 });

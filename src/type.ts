@@ -103,7 +103,7 @@ export function getPropConstructor(obj: object | Constructor, key: string | symb
     return undefined;
 }
 
-type PropConfig = {
+export type PropConfig = {
     type: Type,
     validate: (val: any) => string | undefined,
     stringify: (val: any) => string,
