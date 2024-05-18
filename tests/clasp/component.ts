@@ -2,7 +2,6 @@
 // To compile manually: `tsc component.ts --target es2022 --module esnext --noResolve`
 
 import { test } from "./app/test";
-import { SpreadsheetClient } from "../../src/client";
 import { Component } from "../../src/component";
 import { title } from "../../src/title";
 
