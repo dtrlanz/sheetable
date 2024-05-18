@@ -24,7 +24,6 @@ export class Component<T extends object | object[] = any> {
     private header?: string[][];
 
     static idPrefix = 'cmp';
-    static classNamePrefix = 'field';
     private static idIncr = 0;
     childIdIncr = 0;
 
@@ -71,10 +70,13 @@ export class Component<T extends object | object[] = any> {
                 outerDiv,
                 (group, parentDiv) => {
                     const div = document.createElement('div');
+                    div.dataset.title = group.title;
                     return parentDiv.appendChild(div);
                 },
                 (field, parentDiv) => {
-                    parentDiv.append(...field.getHtml(true));
+                    const fieldHtml = field.getHtml(true);
+
+                    parentDiv.append(...fieldHtml);
                 },
             );
             this.html = outerDiv;
@@ -153,10 +155,8 @@ class UiField {
     title: string;
     dataParent: any;
     dataKey: string | symbol;
-    className: string;
+    keyStr: string;
     propConfig: PropConfig;
-
-    static classNamePrefix = 'field';
 
     constructor(comp: Component, title: string, keyTuple: (string | symbol | number)[]) {
         this.comp = comp;
@@ -165,18 +165,18 @@ class UiField {
 
         let obj = this.comp.data;
         let i = 0
-        let className = '';
+        let keyStr = '';
         for (; i < keyTuple.length - 1; i++) {
             const k = keyTuple[i];
             obj = obj[k];
-            className += `-${String(k)}`;
+            keyStr += `-${String(k)}`;
         }
         const lastKey = keyTuple[i];
         if (typeof lastKey === 'number') {
             throw new Error('Form controls corresponding to items in an array not yet implemented.')
         }
-        className += typeof lastKey === 'symbol' ? '-' : `-${lastKey}`;
-        this.className = UiField.classNamePrefix + className;
+        keyStr += `-${String(lastKey)}`;
+        this.keyStr = keyStr.substring(1);
         this.dataParent = obj;
         this.dataKey = lastKey;
         this.propConfig = getPropConfig(this.dataParent, this.dataKey, this.comp.context);
@@ -206,7 +206,8 @@ class UiField {
         const control = document.createElement('input');
         control.setAttribute('id', this.id);
         control.setAttribute('type', 'text');
-        control.classList.add(this.className);
+        control.dataset.title = this.title;
+        control.dataset.keys = this.keyStr;
         return control;
     }
 
@@ -216,7 +217,8 @@ class UiField {
             this.#label = document.createElement('label');
             this.#label.htmlFor = this.id;
             this.#label.textContent = this.title;
-            this.#label.classList.add(this.className);
+            this.#label.dataset.title = this.title;
+            this.#label.dataset.keys = this.keyStr;
         }
         return this.#label;
     }

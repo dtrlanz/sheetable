@@ -20,7 +20,7 @@ export declare function getPropType(obj: object | Constructor, key: string | sym
 export declare function getPropConstructor(obj: object | Constructor, key: string | symbol, context?: {
     [k: string]: any;
 }): Constructor | undefined;
-type PropConfig = {
+export type PropConfig = {
     type: Type;
     validate: (val: any) => string | undefined;
     stringify: (val: any) => string;
