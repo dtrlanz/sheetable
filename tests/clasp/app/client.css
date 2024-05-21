@@ -54,41 +54,18 @@ select {
   display: grid;
   grid-template-columns: max-content 1fr;
   grid-auto-rows: max-content;
-  gap: 5px 20px;
+  gap: 10px 20px;
 }
-#ui > div::before {
-  counter-reset: indent;
-}
-#ui > div label {
+#ui > div > label {
   grid-column: 1;
 }
-@counter-style indentPositive {
-  system: additive;
-  additive-symbols: 1 "| ";
-  fallback: indentZero;
-}
-@counter-style indentZero {
-  system: cyclic;
-  symbols: "";
-}
-#ui > div label::before {
-  content: counter(indent, indentPositive);
-  color: blue;
-}
-#ui > div input {
+#ui > div > input {
   grid-column: 2;
   box-sizing: border-box;
   width: 100%;
 }
 #ui > div div {
   display: contents;
-}
-#ui > div div::before {
-  content: attr(data-title);
-  counter-increment: indent;
-}
-#ui > div div::after {
-  counter-increment: indent -1;
 }
 .hidden {
   display: none;
