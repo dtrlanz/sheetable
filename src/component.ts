@@ -251,7 +251,13 @@ class UiField {
     private makeControl(): ControlElement {
         const control = document.createElement('input');
         control.setAttribute('id', this.id);
-        control.setAttribute('type', 'text');
+        if (this.propConfig.type === Number 
+            || this.propConfig.type === BigInt) {
+            control.setAttribute('type', 'number');
+            control.setAttribute('step', 'any');
+        } else {
+            control.setAttribute('type', 'text');
+        }
         control.dataset.title = this.title;
         control.dataset.keys = this.keyStr;
         control.addEventListener('change', () => {
