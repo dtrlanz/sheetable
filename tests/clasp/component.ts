@@ -23,18 +23,16 @@ test('show component', async t => {
         b = 42;
     }
 
-    const obj = new B();
-    const arr = [obj, obj]
+    const arr = [new B(), new B()]
     const comp = new Component(arr);
 
     const ui = document.getElementById('ui')!;
     ui.replaceChildren(comp.html);
 
-    const btn = document.createElement('button');
-    ui.appendChild(btn);
-    btn.innerText = "Add row";
+    const btnAdd = document.createElement('button');
+    btnAdd.innerText = "Add row";
     let count = 0;
-    btn.addEventListener('click', () => {
+    btnAdd.addEventListener('click', () => {
         const obj = new B();
         obj.a.foo = 3.14 * count;
         obj.a.bar = 'The quick brown fox jumps over the lazy dog.'.substring(0, count);
@@ -42,5 +40,11 @@ test('show component', async t => {
         arr.push(obj);
         comp.refresh();
         count++;
+    });
+    const btnLog = document.createElement('button');
+    btnLog.innerText = "Log data";
+    btnLog.addEventListener('click', () => {
+        console.log(arr);
     })
+    ui.append(btnAdd, btnLog);
 })

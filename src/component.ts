@@ -254,6 +254,15 @@ class UiField {
         control.setAttribute('type', 'text');
         control.dataset.title = this.title;
         control.dataset.keys = this.keyStr;
+        control.addEventListener('change', () => {
+            const val = this.propConfig.parse(control.value);
+            const validError = this.propConfig.validate(val) ?? '';
+            control.setCustomValidity(validError);
+            control.reportValidity();
+            if (!validError) {
+                this.dataParent[this.dataKey] = val;
+            }
+        })
         return control;
     }
 
