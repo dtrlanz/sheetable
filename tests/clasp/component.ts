@@ -12,7 +12,7 @@ test('show component', async t => {
         foo = 3.14;
 
         @title('Bar')
-        bar = false;
+        bar = "Hello, World!";
     }
 
     class B {
@@ -24,8 +24,23 @@ test('show component', async t => {
     }
 
     const obj = new B();
-    const comp = new Component(obj);
+    const arr = [obj, obj]
+    const comp = new Component(arr);
 
     const ui = document.getElementById('ui')!;
     ui.replaceChildren(comp.html);
+
+    const btn = document.createElement('button');
+    ui.appendChild(btn);
+    btn.innerText = "Add row";
+    let count = 0;
+    btn.addEventListener('click', () => {
+        const obj = new B();
+        obj.a.foo = 3.14 * count;
+        obj.a.bar = 'The quick brown fox jumps over the lazy dog.'.substring(0, count);
+        obj.b = count;
+        arr.push(obj);
+        comp.refresh();
+        count++;
+    })
 })

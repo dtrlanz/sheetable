@@ -20,7 +20,7 @@ export class Component<T extends object | object[] = any> {
     id: string;
     context?: { [k: string]: any; };
     html: HTMLElement;
-    private children: (UiGroup | UiField)[];
+    private children: (UiGroup | UiField)[] = [];
     private header?: string[][];
 
     static idPrefix = 'cmp';
@@ -31,13 +31,10 @@ export class Component<T extends object | object[] = any> {
         this.id = `${Component.idPrefix}${(Component.idIncr++).toString(16)}`;
         this.data = data;
         this.context = context;
-        let sample;
         if (ctor) {
             this.ctor = ctor;
-            sample = Array.isArray(data)
-                ? (data[0] ?? new this.ctor())
-                : data;
         } else {
+            let sample;
             if (Array.isArray(data)) {
                 if (!data.length) {
                     throw new Error('When passing an empty array, a constructor is required as the second argument.');
@@ -48,11 +45,24 @@ export class Component<T extends object | object[] = any> {
             }
             this.ctor = Object.getPrototypeOf(sample).constructor;
         }
-        let structure = getKeysWithTitles(sample, context);
-        if (Array.isArray(data)) {
+        this.html = this.makeHtml();
+    }
+
+    refresh() {
+        const html = this.makeHtml();
+        this.html.replaceWith(html);
+        this.html = html;
+    }
+
+    private makeHtml() {
+        const sample = Array.isArray(this.data)
+            ? (this.data[0] ?? new this.ctor())
+            : this.data;
+        let structure = getKeysWithTitles(sample, this.context);
+        if (Array.isArray(this.data)) {
             this.header = structure.map(([_, title]) => title);
             const rowIds: string[] = [];
-            for (let i = 0; i < data.length; i++) {
+            for (let i = 0; i < this.data.length; i++) {
                 rowIds.push((this.childIdIncr++).toString());
             }
             structure = structure.flatMap(([key, title]) => {
@@ -74,14 +84,49 @@ export class Component<T extends object | object[] = any> {
                     return parentDiv.appendChild(div);
                 },
                 (field, parentDiv) => {
-                    const fieldHtml = field.getHtml(true);
-
+                    const fieldHtml = field.getHtml();
                     parentDiv.append(...fieldHtml);
                 },
             );
-            this.html = outerDiv;
+            return outerDiv;
         } else {
-            throw new Error('To do: implement HTML table generation');
+            const table = document.createElement('table');
+            table.innerHTML = '<thead></thead><tbody></tbody>';
+            const arialabelIds = new Array(this.header.length);
+            for (let row = 0; row < this.header[0].length; row++) {
+                const tr = document.createElement('tr');
+                tr.append(...this.header.map((col, idx) => {
+                    const th = document.createElement('th');
+                    const id = `${this.id}-${(this.childIdIncr++).toString(16)}`;
+                    arialabelIds[idx] = arialabelIds[idx] 
+                        ? `${arialabelIds[idx]} ${id}`
+                        : id;
+                    th.setAttribute('id', id);
+                    th.innerText = col[row] ?? '';
+                    return th;
+                }));
+                table.tHead!.appendChild(tr);
+            }
+            let colIdx = 0;
+            traverse<HTMLTableSectionElement | HTMLTableRowElement>(
+                this.children,
+                table.tBodies[0],
+                (group, parent) => {
+                    if (parent.tagName === 'TBODY') {
+                        colIdx = 0;
+                        return parent.appendChild(document.createElement('tr'));
+                    } else {
+                        return parent;
+                    }
+                },
+                (field, parent) => {
+                    const td = document.createElement('td');
+                    const fieldHtml = field.getHtml(arialabelIds[colIdx++]);
+                    td.append(...fieldHtml);
+                    parent.appendChild(td);
+                },
+            )
+            return table;
         }
     }
 }
@@ -104,7 +149,6 @@ function constructChildren(
             } else {
                 map.set(title[0], [[key, title.splice(1)]]);
             }
-    
         }
     }
     const result: (UiGroup | UiField)[] = [];
@@ -124,7 +168,8 @@ function traverse<C>(
     onGroup: (group: UiGroup, context: C) => C, 
     onField: (field: UiField, context: C) => void,
 ): void {
-    for (const child of children) {
+    for (let idx = 0; idx < children.length; idx++) {
+        const child = children[idx];
         if ('children' in child) {
             const context = onGroup(child, initialContext);
             traverse(child.children, context, onGroup, onField);
@@ -182,9 +227,10 @@ class UiField {
         this.propConfig = getPropConfig(this.dataParent, this.dataKey, this.comp.context);
     }
 
-    getHtml(includeLabel: boolean): HTMLElement[] {
+    getHtml(ariaLabelledBy?: string): HTMLElement[] {
         this.refresh();
-        if (includeLabel) return [this.label, this.control];
+        if (!ariaLabelledBy) return [this.label, this.control];
+        this.control.setAttribute('aria-labelledby', ariaLabelledBy);
         return [this.control];
     }
 
