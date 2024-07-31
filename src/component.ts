@@ -1,7 +1,7 @@
 import { Constructor } from "./meta-props.js";
 import { getKeysWithTitles, title } from "./title.js";
-import { getPropConfig, PropConfig } from "./type.js";
-
+import { getPropConfig, PropConfig, createFromEntries } from "./type.js";
+import { Control, createControl } from "./control.js";
 
 type Child = {
     key: string | symbol | number,
@@ -14,14 +14,20 @@ type Child = {
 type ControlElement = HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement |
     HTMLMeterElement | HTMLOutputElement | HTMLProgressElement;
 
+const getChildHtmlTag: unique symbol = Symbol('getChildHtmlTag');
+const getAriaLabelledBy: unique symbol = Symbol('getAriaLabelledBy');
+
+
 export class Component<T extends object | object[] = any> {
     ctor: Constructor<T>;
     data: T;
     id: string;
     context?: { [k: string]: any; };
     html: HTMLElement;
-    private children: (UiGroup | UiField)[] = [];
-    private header?: string[][];
+    //private children: (UiGroup | UiField)[];
+    private content: UiGroup;
+    private header?: { id: string, text: string }[][];
+    private arialabelIds?: string[];
 
     static idPrefix = 'cmp';
     private static idIncr = 0;
@@ -31,8 +37,12 @@ export class Component<T extends object | object[] = any> {
         this.id = `${Component.idPrefix}${(Component.idIncr++).toString(16)}`;
         this.data = data;
         this.context = context;
+
         if (ctor) {
             this.ctor = ctor;
+
+
+
         } else {
             let sample;
             if (Array.isArray(data)) {
@@ -45,137 +55,88 @@ export class Component<T extends object | object[] = any> {
             }
             this.ctor = Object.getPrototypeOf(sample).constructor;
         }
-        this.html = this.makeHtml();
+
+        let structure = this.getContentStructure();
+        this.content = new UiGroup(this, 0, '', structure);
+        this.html = this.getHtml();
     }
 
     refresh() {
-        const html = this.makeHtml();
+        let structure = this.getContentStructure();
+        this.content.updateStructure(structure);
+        const html = this.getHtml();
         this.html.replaceWith(html);
         this.html = html;
     }
 
-    private makeHtml() {
+    private getContentStructure() {
         const sample = Array.isArray(this.data)
             ? (this.data[0] ?? new this.ctor())
             : this.data;
-        let structure = getKeysWithTitles(sample, this.context);
-        if (Array.isArray(this.data)) {
-            this.header = structure.map(([_, title]) => title);
-            const rowIds: string[] = [];
-            for (let i = 0; i < this.data.length; i++) {
-                rowIds.push((this.childIdIncr++).toString());
-            }
-            structure = structure.flatMap(([key, title]) => {
-                return rowIds.map((rowId, idx) =>
-                    [[idx, ...key], [rowId, ...title]]
-                ) satisfies typeof structure;
-            });
-        }
-        this.children = constructChildren(this, structure);
+        const structure = getKeysWithTitles(sample, this.context);
 
-        if (!this.header) {
-            const outerDiv = document.createElement('div');
-            traverse(
-                this.children,
-                outerDiv,
-                (group, parentDiv) => {
-                    const div = document.createElement('div');
-                    div.dataset.title = group.title;
-                    return parentDiv.appendChild(div);
-                },
-                (field, parentDiv) => {
-                    const fieldHtml = field.getHtml();
-                    parentDiv.append(...fieldHtml);
-                },
-            );
-            return outerDiv;
-        } else {
-            const table = document.createElement('table');
-            table.innerHTML = '<thead></thead><tbody></tbody>';
-            const arialabelIds = new Array(this.header.length);
+        if (!Array.isArray(this.data)) {
+            // only one record of data, so we're done
+            return structure;
+        }
+        // array of records, so generate table structure
+        // generate table header structure
+        this.header = structure.map(([_, titleArr]) => titleArr.map(title => ({ 
+            id: `${this.id}-${(this.childIdIncr++).toString(16)}`, 
+            text: title,
+        })));
+        this.arialabelIds = this.header.map(col => col.map(({ id }) => id).join(' '));
+        // generate table body structure (with given number of rows/records)
+        const rowTitles = new Array<string>(this.data.length);
+        const tableStructure = new Array<typeof structure[0]>(structure.length * this.data.length);
+        for (let i = 0; i < this.data.length; i++) {
+            const rowTitle = `Row ${i + 1}`;
+            for (let j = 0; j < structure.length; j++) {
+                const [key, title] = structure[j];
+                tableStructure[i * structure.length + j] = [[i, ...key], [rowTitle, ...title]];
+            }
+        }
+        return tableStructure;
+    }
+        
+    private getHtml() {
+        if (this.header) {
+            const tHead = document.createElement('thead');
             for (let row = 0; row < this.header[0].length; row++) {
                 const tr = document.createElement('tr');
                 tr.append(...this.header.map((col, idx) => {
                     const th = document.createElement('th');
                     const id = `${this.id}-${(this.childIdIncr++).toString(16)}`;
-                    arialabelIds[idx] = arialabelIds[idx] 
-                        ? `${arialabelIds[idx]} ${id}`
-                        : id;
                     th.setAttribute('id', id);
-                    th.innerText = col[row] ?? '';
+                    th.innerText = col[row]?.text ?? '';
                     return th;
                 }));
-                table.tHead!.appendChild(tr);
+                tHead.appendChild(tr);
             }
-            let colIdx = 0;
-            traverse<HTMLTableSectionElement | HTMLTableRowElement>(
-                this.children,
-                table.tBodies[0],
-                (group, parent) => {
-                    if (parent.tagName === 'TBODY') {
-                        colIdx = 0;
-                        return parent.appendChild(document.createElement('tr'));
-                    } else {
-                        return parent;
-                    }
-                },
-                (field, parent) => {
-                    const td = document.createElement('td');
-                    const fieldHtml = field.getHtml(arialabelIds[colIdx++]);
-                    td.append(...fieldHtml);
-                    parent.appendChild(td);
-                },
-            )
+            const table = document.createElement('table');
+            table.append(tHead, this.content.html as HTMLTableSectionElement);
             return table;
+        } else {
+            return this.content.html as HTMLElement;
         }
     }
-}
 
-function constructChildren(
-    comp: Component, 
-    children: [key: (string | number | symbol)[], title: string[]][],
-    level = 0,
-) {
-    const map = new Map<string, UiField | [key: (string | number | symbol)[], title: string[]][]>();
-    for (const [key, title] of children) {
-        if (title.length === 1) {
-            const field = new UiField(comp, title[0], key);
-            map.set(title[0], field);
-        } else if (title.length > 1) {
-            const arr = map.get(title[0])
-            if (arr) {
-                if (!Array.isArray(arr)) throw new Error(`internal error: inconsistent title array length\ntitle: ${title}`);
-                arr.push([key, title.splice(1)]);
-            } else {
-                map.set(title[0], [[key, title.splice(1)]]);
+    // module-internal method for getting HTML element tag at a given depth
+    [getChildHtmlTag](level: number) {
+        if (this.header) {
+            switch (level) {
+                case 0: return 'tbody';
+                case 1: return 'tr';
+                default: return '';
             }
-        }
-    }
-    const result: (UiGroup | UiField)[] = [];
-    for (const [title, item] of map) {
-        if (Array.isArray(item)) {
-            result.push(new UiGroup(comp, level, title, item));
         } else {
-            result.push(item);
+            return 'div';
         }
     }
-    return result;
-}
 
-function traverse<C>(
-    children: (UiGroup | UiField)[],
-    initialContext: C,
-    onGroup: (group: UiGroup, context: C) => C, 
-    onField: (field: UiField, context: C) => void,
-): void {
-    for (let idx = 0; idx < children.length; idx++) {
-        const child = children[idx];
-        if ('children' in child) {
-            const context = onGroup(child, initialContext);
-            traverse(child.children, context, onGroup, onField);
-        } else {
-            onField(child, initialContext);
-        }
+    // module-internal method for getting HTML IDs of elements labeling a given table column
+    [getAriaLabelledBy](colIdx: number) {
+        return this.arialabelIds?.[colIdx] ?? '';
     }
 }
 
@@ -183,105 +144,191 @@ class UiGroup {
     comp: Component;
     level: number;
     title: string;
-    children: (UiGroup | UiField)[];
+    children: (UiGroup | UiField)[] = [];
+    childrenByTitle?: Map<string, UiGroup | UiField>;
+    html: HTMLElement | HTMLElement[] = [];
 
-    constructor(comp: Component, level: number, title: string, children: [key: (string | number | symbol)[], title: string[]][]) {
+    constructor(
+        comp: Component, 
+        level: number, 
+        title: string, 
+        children: [key: (string | number | symbol)[], title: string[]][],
+        colIter?: Iterator<number>,
+    ) {
         this.comp = comp;
         this.level = level;
         this.title = title;
-        this.children = constructChildren(comp, children, level + 1);
+        this.updateStructure(children, colIter);
     }
 
+    updateStructure(children: [key: (string | number | symbol)[], title: string[]][], colIter?: Iterator<number>) {
+        const tag = this.comp[getChildHtmlTag](this.level);
+        switch (tag) {
+            case '':
+                this.html = [];
+                break;
+            case 'tr':
+                colIter = (function*() {
+                    for (let colIdx = 0; ; colIdx++) {
+                        yield colIdx;
+                    }
+                })();
+            default:
+                this.html = document.createElement(tag);
+                if (this.title) this.html.dataset.title = this.title;
+        }
+
+        type FieldOrGroup = ['field', key: (string | number | symbol)[]]
+            | ['group', children: [key: (string | number | symbol)[], title: string[]][]];
+        const map = new Map<string, FieldOrGroup>();
+
+        for (const [key, title] of children) {
+            if (title.length === 1) {
+                if (map.has(title[0])) throw new Error(`internal error: duplicate field\ntitle: ${title}`);
+                map.set(title[0], ['field', key]);
+            } else if (title.length > 1) {
+                if (!map.has(title[0])) {
+                    map.set(title[0], ['group', [[key, title.splice(1)]]]);
+                    continue;
+                }
+                const group = map.get(title[0])!;
+                if (group[0] !== 'group') throw new Error(`internal error: inconsistent title array length\ntitle: ${title}`);
+                group[1].push([key, title.splice(1)]);
+            }
+        }
+
+        this.children = [];
+        for (const [title, item] of map) {
+            const existing  = this.childrenByTitle?.get(title);
+            if (existing) {
+                if ('children' in existing && item[0] === 'group') {
+                    existing.updateStructure(item[1], colIter);
+                    this.children.push(existing);
+                    continue;
+                } else if (!('children' in existing) && item[0] === 'field') {
+                    existing.updateStructure(item[1], colIter);
+                    this.children.push(existing);
+                    continue;
+                }
+            }
+            if (item[0] === 'group') {
+                this.children.push(new UiGroup(this.comp, this.level + 1, title, item[1], colIter));
+            } else {
+                this.children.push(new UiField(this.comp, title, item[1], colIter));
+            }
+        }
+        
+        this.childrenByTitle = new Map();
+        const childElems: HTMLElement[] = [];
+        for (const child of this.children) {
+            this.childrenByTitle.set(child.title, child);
+            if (Array.isArray(child.html)) {
+                childElems.push(...child.html);
+            } else if (child.html) {
+                childElems.push(child.html);
+            }
+        }
+        if (Array.isArray(this.html)) {
+            this.html = childElems;
+        } else {
+            this.html.replaceChildren(...childElems);
+        }
+    }
 }
 
 class UiField {
     comp: Component;
     id: string;
     title: string;
-    dataParent: any;
-    dataKey: string | symbol;
-    keyStr: string;
+    colIdx?: number;
+    dataObject: any;
+    dataKey: string | symbol | number = '';
+    // @ts-ignore: Property 'propConfig' has no initializer and is not definitely assigned in the constructor. ts(2564)
     propConfig: PropConfig;
+    html?: HTMLElement[];
+    private setValue?: (value: any) => void;
 
-    constructor(comp: Component, title: string, keyTuple: (string | symbol | number)[]) {
+    constructor(comp: Component, title: string, keyTuple: (string | symbol | number)[], colIter?: Iterator<number>) {
         this.comp = comp;
         this.id = `${comp.id}-${(comp.childIdIncr++).toString(16)}`;
         this.title = title;
+        this.updateStructure(keyTuple, colIter);
+    }
 
-        let obj = this.comp.data;
-        let i = 0
+    updateStructure(keyTuple: (string | symbol | number)[], colIter?: Iterator<number>) {
+        if (!keyTuple.length) throw new Error('internal error: `keyTuple` must have at least one element');
+        let deepestProp: [obj: any, key: string | symbol] | undefined;
+        let obj: any = this.comp;
+        let key: string | symbol | number = 'data';
         let keyStr = '';
-        for (; i < keyTuple.length - 1; i++) {
-            const k = keyTuple[i];
-            obj = obj[k];
-            keyStr += `-${String(k)}`;
+        for (let i = 0; i < keyTuple.length; i++) {
+            obj = obj[key];
+            key = keyTuple[i];
+            // Assemble string representation of key tuple. (This is not used by sheetable but 
+            // may be used by the app.)
+            keyStr += `-${String(key)}`;
+            // Track the last key that is not a number so that we can access the most deeply 
+            // nested object property.
+            if (typeof key !== 'number') {
+                deepestProp = [obj, key];
+            }
         }
-        const lastKey = keyTuple[i];
-        if (typeof lastKey === 'number') {
-            throw new Error('Form controls corresponding to items in an array not yet implemented.')
-        }
-        keyStr += `-${String(lastKey)}`;
-        this.keyStr = keyStr.substring(1);
-        this.dataParent = obj;
-        this.dataKey = lastKey;
-        this.propConfig = getPropConfig(this.dataParent, this.dataKey, this.comp.context);
-    }
-
-    getHtml(ariaLabelledBy?: string): HTMLElement[] {
-        this.refresh();
-        if (!ariaLabelledBy) return [this.label, this.control];
-        this.control.setAttribute('aria-labelledby', ariaLabelledBy);
-        return [this.control];
-    }
-
-    refresh() {
-        const val = this.dataParent[this.dataKey];
-        const str = this.propConfig.stringify(val);
-        this.control.value = str;
-    }
-
-    #control?: ControlElement;
-    get control(): ControlElement {
-        if (!this.#control) {
-            this.#control = this.makeControl();
-        }
-        return this.#control;
-    }
-
-    private makeControl(): ControlElement {
-        const control = document.createElement('input');
-        control.setAttribute('id', this.id);
-        if (this.propConfig.type === Number 
-            || this.propConfig.type === BigInt) {
-            control.setAttribute('type', 'number');
-            control.setAttribute('step', 'any');
+        if (!deepestProp) throw new Error('internal error: `keyTuple` must not contain only numbers');
+        this.dataObject = obj;
+        this.dataKey = key;
+        keyStr = keyStr.substring(1);
+        this.propConfig = getPropConfig(deepestProp[0], deepestProp[1], this.comp.context);
+        this.colIdx = colIter?.next().value;
+        
+        let control: Control;
+        let html: HTMLElement[];
+        if (this.colIdx != undefined) {
+            const ariaLabelledBy = this.comp[getAriaLabelledBy](this.colIdx);
+            control = createControl(this.id, ariaLabelledBy, this.propConfig.type);
+            const td = document.createElement('td');
+            td.appendChild(control);
+            html = [td];
         } else {
-            control.setAttribute('type', 'text');
+            control = createControl(this.id, undefined, this.propConfig.type);
+            const label = document.createElement('label');
+            label.htmlFor = this.id;
+            label.textContent = this.title;
+            label.dataset.title = this.title;
+            label.dataset.keys = keyStr;
+            html = [label, control];
         }
         control.dataset.title = this.title;
-        control.dataset.keys = this.keyStr;
+        control.dataset.keys = keyStr;
+        control.value = '42';
         control.addEventListener('change', () => {
             const val = this.propConfig.parse(control.value);
             const validError = this.propConfig.validate(val) ?? '';
             control.setCustomValidity(validError);
             control.reportValidity();
             if (!validError) {
-                this.dataParent[this.dataKey] = val;
+                this.dataObject[this.dataKey] = val;
             }
-        })
-        return control;
+        });
+        this.setValue = function(value: string) {
+            control.value = value;
+        };
+        this.updateValue();
+        // replace old HTML with new
+        if (!this.html?.length) {
+            this.html = html;
+            return;
+        }
+        this.html[0].replaceWith(...html);
+        for (let i = 1; i < this.html.length; i++) {
+            this.html[i].remove();
+        }
+        this.html = html;
     }
 
-    #label?: HTMLLabelElement;
-    get label(): HTMLLabelElement {
-        if (!this.#label) {
-            this.#label = document.createElement('label');
-            this.#label.htmlFor = this.id;
-            this.#label.textContent = this.title;
-            this.#label.dataset.title = this.title;
-            this.#label.dataset.keys = this.keyStr;
-        }
-        return this.#label;
+    updateValue() {
+        const val = this.dataObject[this.dataKey];
+        const strVal = this.propConfig.stringify(val);
+        this.setValue?.(strVal);
     }
 }
 

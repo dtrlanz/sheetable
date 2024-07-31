@@ -1,6 +1,6 @@
 import { MetaProperty, Constructor } from "./meta-props.js";
 
-type Type = Constructor
+export type Type = Constructor
     | typeof String
     | typeof Number
     | typeof BigInt

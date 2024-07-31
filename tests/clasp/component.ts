@@ -1,6 +1,3 @@
-// NB: This file is not (yet) compiled by build.js.
-// To compile manually: `tsc component.ts --target es2022 --module esnext --noResolve`
-
 import { test } from "./app/test";
 import { Component } from "../../src/component";
 import { title } from "../../src/title";
