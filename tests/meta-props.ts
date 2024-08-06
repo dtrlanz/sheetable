@@ -207,3 +207,45 @@ test('conditional meta props', t => {
     t.deepEqual(rainy.entries(ClassA), [['bar', 'brilliant'], ['foo', 'cool']]);
     t.deepEqual(stormy.entries(ClassA), [['bar', 'powerful'], ['foo', 'very good']]);
 });
+
+test('side effects', t => {
+    const magnanimousProp = new MetaProperty<number>('magnanimous', 0);
+    const peripateticProp = new MetaProperty<number>('peripatetic', 0)
+        .addDependency(magnanimousProp, 2, (value, input) => value ? input * 2 : input);
+    const salubriousProp = new MetaProperty<number>('salubrious', 0)
+        .addSideEffect(peripateticProp, 1, (value, input) => value + input);
+    const zygomorphicProp = new MetaProperty<number>('zygomorphic', 0)
+        .addDependency(peripateticProp, 1, (value, input) => value * 1000 + input);
+
+    const [magnanimous, peripatetic, salubrious, zygomorphic] = 
+        [magnanimousProp, peripateticProp, salubriousProp, zygomorphicProp].map(prop => {
+            function inner(value: number) {
+                return prop.getDecorator(value);
+            }
+            inner.get = function(obj: object | Constructor, key?: string | symbol) {
+                return new MetaPropReader(obj).get(prop, key);
+            }
+            return inner;
+        });
+
+    class A {
+        @magnanimous(1) @peripatetic(1)
+        a = 'a';
+        @magnanimous(1) @salubrious(1)
+        b = 'b';
+        @zygomorphic(1)
+        c = 'c';
+    }
+    t.is(magnanimous.get(A, 'a'), 1);       // explicit
+    t.is(magnanimous.get(A, 'b'), 1);       // explicit
+    t.is(magnanimous.get(A, 'c'), 0);       // default
+    t.is(peripatetic.get(A, 'a'), 1);       // explicit
+    t.is(peripatetic.get(A, 'b'), 2);       // implicit: salubrious 1 -> peripatetic 1, then magnanimous 1 -> peripatetic 2
+    t.is(peripatetic.get(A, 'c'), 0);       // default
+    t.is(salubrious.get(A, 'a'), 0);        // default
+    t.is(salubrious.get(A, 'b'), 1);        // explicit
+    t.is(salubrious.get(A, 'c'), 0);        // default
+    t.is(zygomorphic.get(A, 'a'), 1000);    // implicit: peripatetic 1 -> zygomorphic 1000
+    t.is(zygomorphic.get(A, 'b'), 2000);    // implicit: peripatetic 2 -> zygomorphic 2000
+    t.is(zygomorphic.get(A, 'c'), 1);       // explicit
+});

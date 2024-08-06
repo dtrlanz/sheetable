@@ -18,10 +18,22 @@ export class MetaProperty<T> {
         this.defaultValue = defaultValue;
     }
 
+    addDependency<U>(metaProp: MetaProperty<U>, precedence: number, callback: (value: U, input: T) => T): MetaProperty<T> {
+        this.affectedBy.push({ 
+            precedence, 
+            callback: (getValue: <V>(metaProp: MetaProperty<V>) => V, input: T) => {
+                const value = getValue(metaProp);
+                return callback(value, input);
+            }
+        });
+        metaProp.affectedBy.sort((a, b) => a.precedence - b.precedence);
+        return this;
+    }
+
     addSideEffect<U>(metaProp: MetaProperty<U>, precedence: number, callback: (value: T, input: U) => U): MetaProperty<T> {
         metaProp.affectedBy.push({ 
             precedence, 
-            callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: U) => {
+            callback: (getValue: <V>(metaProp: MetaProperty<V>) => V, input: U) => {
                 const value = getValue(this);
                 return callback(value, input);
             }
