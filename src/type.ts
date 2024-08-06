@@ -1,4 +1,4 @@
-import { MetaProperty, Constructor } from "./meta-props.js";
+import { MetaProperty, Constructor, MetaPropReader } from "./meta-props.js";
 
 export type Type = Constructor
     | typeof String
@@ -7,23 +7,20 @@ export type Type = Constructor
     | typeof Boolean
     | typeof Symbol
     | typeof Date
-    | undefined
     | Type[];
 
-const typeProp = new MetaProperty<Type>('type');
+const typeProp = new MetaProperty<Type | undefined>('type', undefined);
 
 export function type(t: Type) {
     return typeProp.getDecorator(t);
 }
 
-export function getPropType(obj: object | Constructor, key: string | symbol, context?: { [k: string]: any }): Type {
+export function getPropType(obj: object | Constructor, key: string | symbol, context?: { [k: string]: any }): Type | undefined {
     // TODO: cache this stuff
 
     // If the property type is specified with @type, use that
-    const t = typeProp.getReader(context).get(obj, key);
-    if (t) {
-        return typeof t === 'function' ? t : undefined;
-    }
+    const t = new MetaPropReader(obj, context).get(typeProp, key);
+    if (t) return t;
 
     // Else try to infer the type from a sample
 
@@ -43,7 +40,7 @@ export function getPropType(obj: object | Constructor, key: string | symbol, con
         arr = true;
     }
 
-    let valType: Type;
+    let valType: Type | undefined;
     switch (typeof val) {
         case 'object':
             valType = val ? Object.getPrototypeOf(val).constructor : undefined;
@@ -67,7 +64,7 @@ export function getPropType(obj: object | Constructor, key: string | symbol, con
         case 'undefined':
             valType = undefined;
     }
-    if (arr) {
+    if (arr && valType) {
         return [valType];
     }
     return valType;
@@ -104,7 +101,7 @@ export function getPropConstructor(obj: object | Constructor, key: string | symb
 }
 
 export type PropConfig = {
-    type: Type,
+    type: Type | undefined,
     validate: (val: any) => string | undefined,
     stringify: (val: any) => string,
     parse: (str: string) => any,

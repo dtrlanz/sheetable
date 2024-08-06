@@ -1,5 +1,5 @@
 import { Constructor } from "./meta-props.js";
-type Type = Constructor | typeof String | typeof Number | typeof BigInt | typeof Boolean | typeof Symbol | typeof Date | undefined | Type[];
+export type Type = Constructor | typeof String | typeof Number | typeof BigInt | typeof Boolean | typeof Symbol | typeof Date | Type[];
 export declare function type(t: Type): {
     (_target: any, context: DecoratorContext): void;
     where(condition: (context: {
@@ -8,7 +8,7 @@ export declare function type(t: Type): {
 };
 export declare function getPropType(obj: object | Constructor, key: string | symbol, context?: {
     [k: string]: any;
-}): Type;
+}): Type | undefined;
 /**
  * Gets the constructor for the specified property, if it is an object type. Returns undefined if
  * the specified property is primitive or non-existent.
@@ -21,7 +21,7 @@ export declare function getPropConstructor(obj: object | Constructor, key: strin
     [k: string]: any;
 }): Constructor | undefined;
 export type PropConfig = {
-    type: Type;
+    type: Type | undefined;
     validate: (val: any) => string | undefined;
     stringify: (val: any) => string;
     parse: (str: string) => any;
@@ -38,4 +38,3 @@ export declare function createRecursively<T extends object>(ctor: Constructor<T>
 export declare function flattenEntries(ctor: Constructor | undefined, entries: [(string | symbol | number)[], any][], context?: {
     [k: string]: any;
 } | undefined): Iterable<[string | symbol | number, any]>;
-export {};

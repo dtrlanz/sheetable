@@ -1,25 +1,42 @@
 import test from 'ava';
-import { MetaProperty } from "../src/meta-props.js";
+import { Constructor, MetaPropReader, MetaProperty } from "../src/meta-props.js";
 
 test('reading something not decorated', t => {
     class ClassA {}
     const obj = new ClassA();
-    let reader = new MetaProperty('prop').getReader();
+    let mp = new MetaProperty('prop', 0);
 
-    t.is(reader.get(ClassA), undefined);
-    t.is(reader.get(obj), undefined);
+    t.is(new MetaPropReader(ClassA).get(mp), 0);
+    t.is(new MetaPropReader(obj).get(mp), 0);
 })
 
 test('simple meta props', t => {
-    const palatableProp = new MetaProperty('palatable');
+    const palatableProp = new MetaProperty<string | undefined>('palatable', undefined);
     const palatable = palatableProp.getDecorator('🍕');
-    let pReader = palatableProp.getReader();
+    const pReader = {
+        get(obj: object | Constructor, key?: string | symbol) {
+            return new MetaPropReader(obj).get(palatableProp, key);
+        },
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj).entries(palatableProp);
+        },
+    }
 
-    const laudableProp = new MetaProperty('laudable');
+    const laudableProp = new MetaProperty<string | undefined>('laudable', undefined);
     function laudable(value: string) {
         return laudableProp.getDecorator(value);
     }
-    let lReader = laudableProp.getReader();
+    const lReader = {
+        get(obj: object | Constructor, key?: string | symbol) {
+            return new MetaPropReader(obj).get(laudableProp, key);
+        },
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj).entries(laudableProp);
+        },
+        list(obj: object | Constructor) {
+            return new MetaPropReader(obj).list(laudableProp);
+        },
+    }
 
     // set meta props
     @palatable
@@ -36,13 +53,13 @@ test('simple meta props', t => {
     t.is(pReader.get(ClassA), '🍕');
     t.is(pReader.get(ClassA, 'foo'), undefined);
     t.is(pReader.get(ClassA, 'bar'), '🍕');
-    t.deepEqual(pReader.entries(ClassA), [['bar', '🍕']])
+    t.deepEqual(pReader.entries(ClassA), [['bar', '🍕']]);
 
     t.is(lReader.get(ClassA), undefined);
     t.is(lReader.get(ClassA, 'foo'), 'very good');
     t.is(lReader.get(ClassA, 'bar'), 'brilliant');
     // accessor decorator runs before field decorator
-    t.deepEqual(lReader.entries(ClassA), [['bar', 'brilliant'], ['foo', 'very good']])
+    t.deepEqual(lReader.entries(ClassA), [['bar', 'brilliant'], ['foo', 'very good']]);
 
     // retrieve meta prop via object
     const objA = new ClassA();
@@ -54,7 +71,7 @@ test('simple meta props', t => {
     t.is(lReader.get(objA), undefined);
     t.is(lReader.get(objA, 'foo'), 'very good');
     t.is(lReader.get(objA, 'bar'), 'brilliant');
-    t.deepEqual(lReader.entries(objA), [['bar', 'brilliant'], ['foo', 'very good']])
+    t.deepEqual(lReader.entries(objA), [['bar', 'brilliant'], ['foo', 'very good']]);
 
     // subclass inherits meta props
     class ClassB extends ClassA {}
@@ -67,7 +84,7 @@ test('simple meta props', t => {
     t.is(lReader.get(ClassB), undefined);
     t.is(lReader.get(ClassB, 'foo'), 'very good');
     t.is(lReader.get(ClassB, 'bar'), 'brilliant');
-    t.deepEqual(lReader.entries(ClassB), [['bar', 'brilliant'], ['foo', 'very good']])
+    t.deepEqual(lReader.entries(ClassB), [['bar', 'brilliant'], ['foo', 'very good']]);
 
     // subclass can shadow superclass meta props
     @laudable('magnificent')
@@ -84,13 +101,13 @@ test('simple meta props', t => {
     t.is(pReader.get(ClassC, 'foo'), '🍕');
     t.is(pReader.get(ClassC, 'bar'), '🍕');
     t.is(pReader.get(ClassC, 'baz'), '🍕');
-    t.deepEqual(pReader.entries(ClassC), [['bar', '🍕'], ['foo', '🍕'], ['baz', '🍕']])
+    t.deepEqual(pReader.entries(ClassC), [['bar', '🍕'], ['foo', '🍕'], ['baz', '🍕']]);
 
     t.is(lReader.get(ClassC), 'magnificent');
     t.is(lReader.get(ClassC, 'foo'), 'not bad');
     t.is(lReader.get(ClassC, 'bar'), 'brilliant');
     t.is(lReader.get(ClassC, 'baz'), undefined);
-    t.deepEqual(lReader.entries(ClassC), [['bar', 'brilliant'], ['foo', 'not bad']])
+    t.deepEqual(lReader.entries(ClassC), [['bar', 'brilliant'], ['foo', 'not bad']]);
 
     // superclass meta props are unchanged
     t.is(pReader.get(ClassA), '🍕');
@@ -101,7 +118,7 @@ test('simple meta props', t => {
     t.is(lReader.get(ClassA), undefined);
     t.is(lReader.get(ClassA, 'foo'), 'very good');
     t.is(lReader.get(ClassA, 'bar'), 'brilliant');
-    t.deepEqual(lReader.entries(ClassA), [['bar', 'brilliant'], ['foo', 'very good']])
+    t.deepEqual(lReader.entries(ClassA), [['bar', 'brilliant'], ['foo', 'very good']]);
 
     t.is(pReader.get(ClassB), '🍕');
     t.is(pReader.get(ClassB, 'foo'), undefined);
@@ -111,7 +128,7 @@ test('simple meta props', t => {
     t.is(lReader.get(ClassB), undefined);
     t.is(lReader.get(ClassB, 'foo'), 'very good');
     t.is(lReader.get(ClassB, 'bar'), 'brilliant');
-    t.deepEqual(lReader.entries(ClassB), [['bar', 'brilliant'], ['foo', 'very good']])
+    t.deepEqual(lReader.entries(ClassB), [['bar', 'brilliant'], ['foo', 'very good']]);
 
     // list() returns truthy entries
     class ClassD extends ClassC {
@@ -125,14 +142,30 @@ test('simple meta props', t => {
 });
 
 test('conditional meta props', t => {
-    const laudableProp = new MetaProperty('laudable');
+    const laudableProp = new MetaProperty<string | undefined>('laudable', undefined);
     function laudable(value: string) {
         return laudableProp.getDecorator(value);
     }
-    const normal = laudableProp.getReader();
-    const sunny = laudableProp.getReader({ weather: 'sunny' });
-    const rainy = laudableProp.getReader({ weather: 'rainy' });
-    const stormy = laudableProp.getReader({ weather: 'stormy' });
+    const normal = {
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj).entries(laudableProp);
+        },
+    }
+    const sunny = {
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj, { weather: 'sunny' }).entries(laudableProp);
+        },
+    }
+    const rainy = {
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj, { weather: 'rainy' }).entries(laudableProp);
+        },
+    }
+    const stormy = {
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj, { weather: 'stormy' }).entries(laudableProp);
+        },
+    }
 
     // set meta props
     class ClassA {

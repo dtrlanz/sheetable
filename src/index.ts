@@ -1,10 +1,10 @@
 import { Header } from "./headers.js";
-import { Constructor, MetaProperty } from "./meta-props.js";
+import { Constructor, MetaPropReader, MetaProperty } from "./meta-props.js";
 import { getIndexTitles } from "./title.js";
 import { flattenEntries } from "./type.js";
 import { Scalar } from "./values.js";
 
-const indexProp = new MetaProperty('index');
+const indexProp = new MetaProperty('index', false);
 export const index = indexProp.getDecorator(true);
 
 /**
@@ -141,7 +141,7 @@ export class Index<T extends object, V> {
 }
 
 export function getIndexKeys(ctor: Constructor, context?: { readonly [k: string]: any }): (string | symbol)[] {
-    return indexProp.getReader(context).list(ctor);
+    return new MetaPropReader(ctor, context).list(indexProp);
 }
 
 type TupleMapNode<T> = { value?: T, next: Map<any, TupleMapNode<T>> };

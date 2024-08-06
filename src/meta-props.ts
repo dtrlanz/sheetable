@@ -1,15 +1,37 @@
 // Symbol.metadata polyfill
-(Symbol as any).metadata ??= Symbol("Symbol.metadata");
+(Symbol as any).metadata ??= Symbol('Symbol.metadata');
+
+const metadataKey: unique symbol = Symbol('meta-properties');
+
+type SideEffect<T> = {
+    precedence: number,
+    callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: T) => T,
+};
 
 export class MetaProperty<T> {
-    key: symbol;
+    description: string;
+    defaultValue: T;
+    affectedBy: SideEffect<T>[] = [];
 
-    constructor(desciption?: string) {
-        this.key = Symbol(desciption);
+    constructor(desciption: string, defaultValue: T) {
+        this.description = desciption;
+        this.defaultValue = defaultValue;
+    }
+
+    addSideEffect<U>(metaProp: MetaProperty<U>, precedence: number, callback: (value: T, input: U) => U): MetaProperty<T> {
+        metaProp.affectedBy.push({ 
+            precedence, 
+            callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: U) => {
+                const value = getValue(this);
+                return callback(value, input);
+            }
+        });
+        metaProp.affectedBy.sort((a, b) => a.precedence - b.precedence);
+        return this;
     }
 
     getDecorator(value: T) {
-        const metaPropkey = this.key;
+        const metaProp = this;
         function decorator(_target: any, context: DecoratorContext): void {
             updateMetadata(context, value);
         }
@@ -21,72 +43,100 @@ export class MetaProperty<T> {
         return decorator;
 
         function updateMetadata({ metadata, name, kind }: DecoratorContext, value: T, condition?: MetaPropCondition) {
-            let map = metadata[metaPropkey] as Map<String | symbol | undefined, MetaPropRecord<T>> | undefined;
-            if (!Object.hasOwn(metadata, metaPropkey)) {
-                // inherit from superclass metadata
-                const entries = [...map ?? []].map(([name, data]) => [name, {
-                    default: data.default,
-                    // clone to avoid modifying superclass metadata
-                    conditional: [...data.conditional],
-                    kind: data.kind,
-                }] as [String | symbol | undefined, MetaPropRecord<T>]);
-                metadata[metaPropkey] = map = new Map(entries);
-                map;
+            let decoratedProps = metadata[metadataKey] as Map<string | symbol | undefined, Map<MetaProperty<any>, MetaPropRecord<any>>> | undefined;
+            if (!decoratedProps || !Object.hasOwn(metadata, metadataKey)) {
+                const superDecoratedProps = decoratedProps
+                metadata[metadataKey] = decoratedProps = new Map();
+                if (superDecoratedProps) {
+                    // inherit from superclass
+                    for (const [propKey, propMetaProps] of superDecoratedProps) {
+                        const copy: typeof propMetaProps = new Map();
+                        for (const [metaPropKey, metaPropRecord] of propMetaProps) {
+                            // clone to avoid modifying superclass metadata
+                            copy.set(metaPropKey, {
+                                value: metaPropRecord.value,
+                                conditional: [...metaPropRecord.conditional],
+                            })
+                        }
+                        decoratedProps.set(propKey, copy);
+                    }
+                }
             }
             if (kind === 'class') {
                 // store all class decorator value under `undefined` to distinguish them from 
                 // member decorator values
                 name = undefined;
             }
-            let entry = map!.get(name);
+            let propMetaProps = decoratedProps.get(name);
+            if (!propMetaProps) {
+                decoratedProps.set(name, propMetaProps = new Map());
+            }
+            let entry = propMetaProps.get(metaProp);
             if (!entry) {
-                map!.set(name, entry = {
-                    conditional: [],
-                    kind: kind,
-                });
+                propMetaProps!.set(metaProp, entry = { conditional: [] });
             }
             if (condition) {
                 entry.conditional.push({ value, condition });
             } else {
-                entry.default = value;
+                entry.value = value;
             }
         }        
     }
-
-    getReader(context: { [k: string]: any } = {}): MetaPropReader<T> {
-        return new MetaPropReader(this.key, context);
-    }
 }
 
-class MetaPropReader<T> {
-    metaPropKey: symbol;
+const getValue = Symbol('get value');
+
+const recursionFlag = Symbol('recursionFlag');
+
+export class MetaPropReader {
+    private ctor: Constructor;
     context: { [k: string]: any };
+    cache: Map<string | symbol | undefined, Map<MetaProperty<any>, any>> = new Map();
     
-    constructor(metaPropKey: symbol, context: { [k: string]: any }) {
-        this.metaPropKey = metaPropKey;
+    constructor(obj: object | Constructor, context: { [k: string]: any } = {}) {
+        this.ctor = typeof obj === 'function' ? obj : Object.getPrototypeOf(obj).constructor;
         this.context = context;
     }
 
-    private getData(obj: object | Constructor): Map<String | symbol | undefined, MetaPropRecord<T>> | undefined {
-        const ctor = typeof obj === 'function' ? obj : Object.getPrototypeOf(obj).constructor;
-        return ctor[Symbol.metadata]?.[this.metaPropKey];
-    }
-
-    /**
-     * Returns value of this meta property for a given class or class members
-     * 
-     * @param obj - instance or constructor of the class to which this meta property was applied
-     * @param [key] - property key; if omitted, returns value applied by class decorator
-     * @returns value or undefined
-     */
-    get(obj: object | Constructor, key?: string | symbol): T | undefined {
-        const map = this.getData(obj);
-        const record = map?.get(key);
-        if (!record) return undefined;
-        for (const { condition, value } of record.conditional) {
-            if (condition(this.context)) return value;
+    get<T>(metaProp: MetaProperty<T>, key?: string | symbol): T {
+        const context = this.context;
+        let cache: Map<MetaProperty<any>, any>;
+        if (this.cache.has(key)) {
+            cache = this.cache.get(key)!;
+        } else {
+            this.cache.set(key, cache = new Map());
         }
-        return record.default;
+        const metaProps = (this.ctor[Symbol.metadata]?.[metadataKey] as 
+            Map<string | symbol | undefined, Map<MetaProperty<any>, MetaPropRecord<any>>> | undefined)
+            ?.get(key);
+
+        return getLazily(metaProp);
+
+        function getLazily<T>(mp: MetaProperty<T>): T {
+            const cached = cache.get(mp);
+            if (cached) {
+                if (cached === recursionFlag) throw new Error('Unable to get value meta property due to recursive dependencies.');
+                return cached;
+            }
+            cache.set(mp, recursionFlag);
+            const record = metaProps?.get(mp);
+            const value = getExpensively(mp, record);
+            cache.set(mp, value);
+            return value;
+        }
+
+        function getExpensively<T>(mp: MetaProperty<T>, record: MetaPropRecord<any> | undefined) {
+            if (record) {
+                for (const { condition, value } of record.conditional) {
+                    if (condition(context)) return value;
+                }
+                if (record.value !== undefined) return record.value;
+            }
+            return mp.affectedBy.reduce(
+                (prev, sideEffect) => sideEffect.callback((mp) => getLazily(mp), prev),
+                mp.defaultValue,
+            );
+        }        
     }
 
     /**
@@ -95,29 +145,22 @@ class MetaPropReader<T> {
      * @param obj - instance or constructor of the class to which this meta property was applied
      * @returns array of key-value pairs
      */
-    entries(obj: object | Constructor): [(string | symbol), T][] {
-        const arr = [];
-        for (const [key, record] of this.getData(obj) ?? []) {
+    entries<T>(metaProp: MetaProperty<T>): [(string | symbol), Exclude<T, undefined>][] {
+        const decoratedProps = this.ctor[Symbol.metadata]?.[metadataKey] as 
+            Map<string | symbol | undefined, Map<MetaProperty<any>, MetaPropRecord<any>>> | undefined;
+
+        const arr: [(string | symbol), Exclude<T, undefined>][] = [];
+        for (const key of decoratedProps?.keys() ?? []) {
             if (key === undefined) continue;
-            let val = record.default;
-            for (const { condition, value } of record.conditional) {
-                if (condition(this.context)) {
-                    val = value
-                }
-            }
-            if (val !== undefined) arr.push([key, val] as [(string | symbol), T]);
+            const value = this.get(metaProp, key);
+            if (value === undefined) continue;
+            arr.push([key, value as any]);
         }
         return arr;
     }
 
-    /**
-     * Returns keys of class members for which this meta property has a truthy value
-     * 
-     * @param obj - instance or constructor of the class to which this meta property was applied
-     * @returns array of keys
-     */
-    list(obj: object | Constructor): (string | symbol)[] {
-        return this.entries(obj)
+    list<T>(metaProp: MetaProperty<T>) {
+        return this.entries(metaProp)
             .filter(([_, v]) => v)
             .map(([k]) => k);
     }
@@ -128,12 +171,11 @@ export type Constructor<T = object> = new (...args: any[]) => T;
 type MetaPropCondition = (context: { [k: string]: any }) => boolean;
 
 type MetaPropRecord<T> = {
-    default?: T,
+    value?: T,
     conditional: ({
         condition: MetaPropCondition,
         value: T,
     })[],
-    kind: DecoratorContext['kind'],
 };
 
 
