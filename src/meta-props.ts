@@ -145,16 +145,16 @@ export class MetaPropReader {
      * @param obj - instance or constructor of the class to which this meta property was applied
      * @returns array of key-value pairs
      */
-    entries<T>(metaProp: MetaProperty<T>): [(string | symbol), Exclude<T, undefined>][] {
+    entries<T>(metaProp: MetaProperty<T>): [(string | symbol), NonNullable<T>][] {
         const decoratedProps = this.ctor[Symbol.metadata]?.[metadataKey] as 
             Map<string | symbol | undefined, Map<MetaProperty<any>, MetaPropRecord<any>>> | undefined;
 
-        const arr: [(string | symbol), Exclude<T, undefined>][] = [];
+        const arr: [(string | symbol), NonNullable<T>][] = [];
         for (const key of decoratedProps?.keys() ?? []) {
             if (key === undefined) continue;
             const value = this.get(metaProp, key);
-            if (value === undefined) continue;
-            arr.push([key, value as any]);
+            if (value == undefined) continue;
+            arr.push([key, value]);
         }
         return arr;
     }
