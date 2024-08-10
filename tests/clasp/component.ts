@@ -5,10 +5,10 @@ import { type } from "../../src/type";
 
 test('show component', async t => {
     class A {
-        @title('Foo') @type(Number)
+        @title('Foo')
         foo = 3.14;
 
-        @title('Bar') @type(String)
+        @title('Bar')
         bar = "Hello, World!";
     }
 
@@ -16,7 +16,7 @@ test('show component', async t => {
         @title('Apples')
         a = new A();
 
-        @title('Oranges') @type(Number)
+        @title('Oranges')
         b = 42;
     }
 

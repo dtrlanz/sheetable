@@ -5,7 +5,7 @@ const metadataKey: unique symbol = Symbol('meta-properties');
 
 type SideEffect<T> = {
     precedence: number,
-    callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: T) => T,
+    callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: T, getMetaPropReader: (ctor?: Constructor) => MetaPropReader, ctor: Constructor, key: string | symbol | undefined) => T,
 };
 
 export class MetaProperty<T> {
@@ -19,7 +19,7 @@ export class MetaProperty<T> {
     }
 
     addDependency<U>(metaProp: MetaProperty<U>, precedence: number, callback: (value: U, input: T) => T): MetaProperty<T> {
-        this.affectedBy.push({ 
+        this.affectedBy.push({
             precedence, 
             callback: (getValue: <V>(metaProp: MetaProperty<V>) => V, input: T) => {
                 const value = getValue(metaProp);
@@ -112,6 +112,7 @@ export class MetaPropReader {
 
     get<T>(metaProp: MetaProperty<T>, key?: string | symbol): T {
         const context = this.context;
+        const ctor = this.ctor;
         let cache: Map<MetaProperty<any>, any>;
         if (this.cache.has(key)) {
             cache = this.cache.get(key)!;
@@ -145,10 +146,14 @@ export class MetaPropReader {
                 if (record.value !== undefined) return record.value;
             }
             return mp.affectedBy.reduce(
-                (prev, sideEffect) => sideEffect.callback((mp) => getLazily(mp), prev),
+                (prev, sideEffect) => sideEffect.callback((mp) => getLazily(mp), prev, getMetaPropReader, ctor, key),
                 mp.defaultValue,
             );
-        }        
+        }
+
+        function getMetaPropReader(obj?: object | Constructor): MetaPropReader {
+            return new MetaPropReader(obj ?? ctor, context);
+        }
     }
 
     /**
@@ -191,3 +196,35 @@ type MetaPropRecord<T> = {
 };
 
 
+export const defaultProp = new MetaProperty<any>('default', undefined);
+defaultProp.affectedBy.push({
+    precedence: 0,
+    callback: (_g, _i, getMetaPropReader, ctor, key) => {
+        if (key) {
+            const reader = getMetaPropReader();
+            const defaultObj = reader.get(defaultProp);
+            return defaultObj[key];
+        } else {
+            return createFromEntries(ctor, []);
+        }
+
+        // duplicated from type.ts (temporary workaround; TODO clean up later)
+        function createFromEntries<T>(ctor: Constructor<T>, entries: [string | symbol, any][]): T | undefined {
+            // If a `fromEntries` static method exists, call that
+            if (typeof (ctor as any).fromEntries === 'function') {
+                return (ctor as any).fromEntries(entries);
+            }
+        
+            // Otherwise try calling the constructor with zero args, then setting properties
+            try {
+                const obj = new ctor();
+                for (const [k, v] of entries) {
+                    (obj as any)[k] = v;
+                }
+                return obj;
+            } catch (_) {
+                return undefined;
+            }
+        }
+    }
+});

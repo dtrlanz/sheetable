@@ -1,4 +1,4 @@
-import { MetaProperty, Constructor, MetaPropReader } from "./meta-props.js";
+import { MetaProperty, Constructor, MetaPropReader, defaultProp } from "./meta-props.js";
 
 export type Type = Constructor
     | typeof String
@@ -9,7 +9,24 @@ export type Type = Constructor
     | typeof Date
     | Type[];
 
-export const typeProp = new MetaProperty<Type | undefined>('type', undefined);
+export const typeProp = new MetaProperty<Type | undefined>('type', undefined)
+    .addDependency(defaultProp, 0, defaultValue => {
+        switch (typeof defaultValue) {
+            case 'string': return String;
+            case 'number': return Number;
+            case 'bigint': return BigInt;
+            case 'boolean': return Boolean;
+            case 'symbol': return Symbol;
+            case 'object':
+                if (defaultValue instanceof Date) {
+                    return Date;
+                } else if (!Array.isArray(defaultValue)) {
+                    return Object.getPrototypeOf(defaultValue).constructor;
+                }
+            default:
+                return undefined;
+        }
+    });
 
 export function type(t: Type) {
     return typeProp.getDecorator(t);
