@@ -1,14 +1,14 @@
 import { test } from "./app/test";
 import { Component } from "../../src/component";
 import { title } from "../../src/title";
-
+import { type } from "../../src/type";
 
 test('show component', async t => {
     class A {
-        @title('Foo')
+        @title('Foo') @type(Number)
         foo = 3.14;
 
-        @title('Bar')
+        @title('Bar') @type(String)
         bar = "Hello, World!";
     }
 
@@ -16,7 +16,7 @@ test('show component', async t => {
         @title('Apples')
         a = new A();
 
-        @title('Oranges')
+        @title('Oranges') @type(Number)
         b = 42;
     }
 

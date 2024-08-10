@@ -1,7 +1,7 @@
-import { Constructor } from "./meta-props.js";
+import { Constructor, MetaPropReader, MetaProperty } from "./meta-props.js";
 import { getKeysWithTitles, title } from "./title.js";
-import { getPropConfig, PropConfig, createFromEntries } from "./type.js";
-import { Control, createControl } from "./control.js";
+import { validateProp, stringifyProp, parseProp } from "./type.js";
+import { Control, controlProp } from "./control.js";
 
 type Child = {
     key: string | symbol | number,
@@ -243,9 +243,9 @@ class UiField {
     colIdx?: number;
     dataObject: any;
     dataKey: string | symbol | number = '';
-    // @ts-ignore: Property 'propConfig' has no initializer and is not definitely assigned in the constructor. ts(2564)
-    propConfig: PropConfig;
     html?: HTMLElement[];
+    // @ts-ignore Property 'getMP' has no initializer and is not definitely assigned in the constructor. ts(2564)
+    private getMP: <T>(metaProp: MetaProperty<T>) => T;
     private setValue?: (value: any) => void;
 
     constructor(comp: Component, title: string, keyTuple: (string | symbol | number)[], colIter?: Iterator<number>) {
@@ -277,32 +277,38 @@ class UiField {
         this.dataObject = obj;
         this.dataKey = key;
         keyStr = keyStr.substring(1);
-        this.propConfig = getPropConfig(deepestProp[0], deepestProp[1], this.comp.context);
         this.colIdx = colIter?.next().value;
-        
+        this.getMP = <T>(metaProp: MetaProperty<T>) => {
+            return new MetaPropReader(deepestProp![0], this.comp.context).get(metaProp, deepestProp![1]);
+        } 
+
         let control: Control;
-        let html: HTMLElement[];
+        let html: DocumentFragment;
         if (this.colIdx != undefined) {
             const ariaLabelledBy = this.comp[getAriaLabelledBy](this.colIdx);
-            control = createControl(this.id, ariaLabelledBy, this.propConfig.type);
+            control = this.getMP(controlProp).createControl(this.id, ariaLabelledBy);
             const td = document.createElement('td');
-            td.appendChild(control);
-            html = [td];
+            td.append(control.html);
+            html = new DocumentFragment();
+            html.append(td);
         } else {
-            control = createControl(this.id, undefined, this.propConfig.type);
             const label = document.createElement('label');
             label.htmlFor = this.id;
             label.textContent = this.title;
             label.dataset.title = this.title;
             label.dataset.keys = keyStr;
-            html = [label, control];
+            control = this.getMP(controlProp).createControl(this.id, label);
+            html = control.html;
         }
-        control.dataset.title = this.title;
-        control.dataset.keys = keyStr;
-        control.value = '42';
+        control.element.dataset.title = this.title;
+        control.element.dataset.keys = keyStr;
         control.addEventListener('change', () => {
-            const val = this.propConfig.parse(control.value);
-            const validError = this.propConfig.validate(val) ?? '';
+            let val = control.getValue();
+            const parse = this.getMP(parseProp);
+            if (parse && typeof val === 'string') {
+                val = parse(val);
+            }
+            const validError = this.getMP(validateProp)?.(val) ?? '';
             control.setCustomValidity(validError);
             control.reportValidity();
             if (!validError) {
@@ -310,24 +316,25 @@ class UiField {
             }
         });
         this.setValue = function(value: string) {
-            control.value = value;
+            control.setValue(value);
         };
         this.updateValue();
         // replace old HTML with new
+        const htmlArr = Array.from(html.children) as HTMLElement[]
         if (!this.html?.length) {
-            this.html = html;
+            this.html = Array.from(htmlArr);
             return;
         }
-        this.html[0].replaceWith(...html);
+        this.html[0].replaceWith(...htmlArr);
         for (let i = 1; i < this.html.length; i++) {
             this.html[i].remove();
         }
-        this.html = html;
+        this.html = htmlArr;
     }
 
     updateValue() {
         const val = this.dataObject[this.dataKey];
-        const strVal = this.propConfig.stringify(val);
+        const strVal = this.getMP(stringifyProp)(val);
         this.setValue?.(strVal);
     }
 }
