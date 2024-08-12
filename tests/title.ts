@@ -4,7 +4,7 @@ import { title, spread, rest, getObjectPath, getKeysWithTitles } from "../src/ti
 /**
  * Note: The current implementation relies on `Object.entries()` to find an object's properties.
  * This means that non-enumerable properties (e.g., symbol properties, accessors in classes) are 
- * skipped. While, that's not necessarily ideal, any other solution would involve further design 
+ * skipped. While that's not necessarily ideal, any other solution would involve further design 
  * decisions, incl. about enumeration order. Those decisions should be deferred until it's clear
  * what use cases cannot be adequately addressed with current workarounds.
  * 

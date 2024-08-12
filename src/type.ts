@@ -1,22 +1,43 @@
-import { MetaProperty, Constructor } from "./meta-props.js";
+import { MetaProperty, Constructor, MetaPropReader, defaultProp } from "./meta-props.js";
 
-type Type = 'string' | 'number' | 'bigint' | 'boolean' | 'symbol'
-    | Constructor;
+export type Type = Constructor
+    | typeof String
+    | typeof Number
+    | typeof BigInt
+    | typeof Boolean
+    | typeof Symbol
+    | typeof Date
+    | Type[];
 
-const typeProp = new MetaProperty<Type>('type');
+export const typeProp = new MetaProperty<Type | undefined>('type', undefined)
+    .addDependency(defaultProp, 0, defaultValue => {
+        switch (typeof defaultValue) {
+            case 'string': return String;
+            case 'number': return Number;
+            case 'bigint': return BigInt;
+            case 'boolean': return Boolean;
+            case 'symbol': return Symbol;
+            case 'object':
+                if (defaultValue instanceof Date) {
+                    return Date;
+                } else if (!Array.isArray(defaultValue)) {
+                    return Object.getPrototypeOf(defaultValue).constructor;
+                }
+            default:
+                return undefined;
+        }
+    });
 
 export function type(t: Type) {
     return typeProp.getDecorator(t);
 }
 
-export function getPropConstructor(obj: object | Constructor, key: string | symbol, context?: { [k: string]: any }): Constructor | undefined {
+export function getPropType(obj: object | Constructor, key: string | symbol, context?: { [k: string]: any }): Type | undefined {
     // TODO: cache this stuff
 
     // If the property type is specified with @type, use that
-    const t = typeProp.getReader(context).get(obj, key);
-    if (t) {
-        return typeof t === 'function' ? t : undefined;
-    }
+    const t = new MetaPropReader(obj, context).get(typeProp, key);
+    if (t) return t;
 
     // Else try to infer the type from a sample
 
@@ -25,18 +46,273 @@ export function getPropConstructor(obj: object | Constructor, key: string | symb
         const o = createFromEntries(obj as Constructor, []);
         if (!o) return undefined;
         obj = o;
-    }
+    }    
 
     let val = (obj as any)[key];
     
     // in case of array, use first element as sample
+    let arr = false;
     if (Array.isArray(val)) {
         val = val[0];
+        arr = true;
     }
 
-    if (val && typeof val === 'object') {
-        return Object.getPrototypeOf(val).constructor;
+    let valType: Type | undefined;
+    switch (typeof val) {
+        case 'object':
+            valType = val ? Object.getPrototypeOf(val).constructor : undefined;
+            break;
+        case 'string':
+            valType = String;
+            break;
+        case 'number':
+            valType = Number;
+            break;
+        case 'bigint':
+            valType = BigInt;
+            break;
+        case 'boolean':
+            valType = Boolean;
+            break;
+        case 'symbol':
+            valType = Symbol;
+            break;
+        case 'function':
+        case 'undefined':
+            valType = undefined;
     }
+    if (arr && valType) {
+        return [valType];
+    }
+    return valType;
+}
+
+/**
+ * Gets the constructor for the specified property, if it is an object type. Returns undefined if
+ * the specified property is primitive or non-existent.
+ * @param obj - the parent object or its constructor
+ * @param key - the property key
+ * @param context - context object for filtering decorators
+ * @returns Constructor | undefined - the constructor function for the specified property
+ */
+export function getPropConstructor(obj: object | Constructor, key: string | symbol, context?: { [k: string]: any }): Constructor | undefined {
+    let propCtor = getPropType(obj, key, context);
+    
+    // in case of array, use first element as sample
+    if (Array.isArray(propCtor)) {
+        propCtor = propCtor[0];
+    }
+
+    if (typeof propCtor === 'function') {
+        if (
+            propCtor !== String && 
+            propCtor !== Boolean && 
+            propCtor !== Number && 
+            propCtor !== BigInt && 
+            propCtor !== Symbol
+        ) {
+            return propCtor as Constructor;
+        }
+    }
+    return undefined;
+}
+
+export const parseProp = new MetaProperty<((str: string) => any) | undefined>('parse', undefined)
+    .addDependency(typeProp, 0, type => {
+        switch (type) {
+            case String: 
+                return v => v;
+            case Number: 
+                return Number.parseFloat;
+            case BigInt: 
+                return BigInt;
+            case Date: 
+                return v => new Date(v);
+            case Boolean: 
+                return v => v.trim().toLowerCase() === 'true';
+            case Symbol:
+            case undefined:
+                return undefined;
+            default:
+                return JSON.parse;
+        }
+    });
+
+export function parse(parser: (str: string) => any) {
+    return parseProp.getDecorator(parser);
+}
+
+export const stringifyProp = new MetaProperty<(val: any) => string>('stringify', v => `${v}`)
+    .addDependency(typeProp, 0, (type, toString) => {
+        switch (type) {
+            case String:
+            case Number:
+            case BigInt:
+            case Boolean:
+            case Symbol:
+            case Date:
+                return toString;
+            default:
+                return JSON.stringify;
+        }
+    });
+
+export function stringify(stringifier: (val: any) => string) {
+    return stringifyProp.getDecorator(stringifier);
+}
+
+export const validateProp = new MetaProperty<((val: any) => string) | undefined>('validate', undefined)
+    .addDependency(typeProp, 0, type => {
+        switch (type) {
+            case String:
+                return v => typeof v === 'string' ? '' : 'string required';
+            case Number:
+                return v => typeof v === 'number' && !Number.isNaN(v) ? '' : 'number required';
+            case BigInt:
+                return v => typeof v === 'bigint' ? '' : 'bigint required';
+            case Boolean:
+                return v => typeof v === 'boolean' ? '' : 'boolean required';
+            case Symbol:
+                return v => typeof v === 'symbol' ? '' : 'symbol required';
+            case Date:
+                return v => v instanceof Date ? '' : 'date required';
+            case undefined:
+                return undefined
+            default:
+                if (Array.isArray(type)) {
+                    return v => Array.isArray(v) ? '' : 'array required';
+                } else {
+                    return v => v instanceof type ? '' : `${type.name} required`;
+                }
+        }
+    });
+
+export function validate(validation: (val: any) => string) {
+    return validateProp.getDecorator(validation);
+}
+
+// export type PropConfig = {
+//     type: Type | undefined,
+//     validate: (val: any) => string | undefined,
+//     stringify: (val: any) => string,
+//     parse: (str: string) => any,
+// };
+
+// export function getPropConfig(obj: object | Constructor, key: string | symbol, context?: { [k: string]: any }): PropConfig {
+//     const propType = getPropType(obj, key, context);
+
+//     let validate: PropConfig['validate'];
+//     let stringify: PropConfig['stringify'];
+//     let parse: PropConfig['parse'];
+
+//     switch (propType) {
+//         case String:
+//             validate = v => typeof v === 'string' ? '' : 'string required';
+//             stringify = v => String(v);
+//             parse = v => v;
+//             break;
+//         case Number:
+//             validate = v => typeof v === 'number' && !Number.isNaN(v) ? '' : 'number required';
+//             stringify = v => String(v);
+//             parse = v => Number.parseFloat(v);
+//             break;
+//         case BigInt:
+//             validate = v => typeof v === 'bigint' ? '' : 'bigint required';
+//             stringify = v => String(v);
+//             parse = v => {
+//                 try {
+//                     return BigInt(v);
+//                 } catch (_) {
+//                     return undefined;
+//                 }
+//             };
+//             break;
+//         case Boolean:
+//             validate = v => typeof v === 'boolean' ? '' : 'boolean required';
+//             stringify = v => v ? 'true' : '';
+//             parse = v => Boolean(v);
+//             break;
+//         case Symbol:
+//             validate = v => typeof v === 'symbol' ? '' : 'symbol required';
+//             stringify = v => String(v);
+//             parse = v => { throw new Error(`cannot convert string to symbol: ${v}`); };
+//             break;
+//         case Date:
+//             validate = v => v instanceof Date ? '' : 'date required';
+//             stringify = v => (v as Date).toISOString();
+//             parse = v => new Date(v);
+//         case undefined:
+//             validate = v => typeof v === 'undefined' ? '' : 'undefined required';
+//             stringify = v => String(v);
+//             // We could just return undefined here. But if this function ever gets called,
+//             // there's probably something wrong.
+//             parse = v => { throw new Error(`cannot convert string to undefined: ${v}`); };
+//             break;
+//         default:
+//             if (Array.isArray(propType)) {
+//                 validate = v => Array.isArray(v) ? '' : 'array required';
+//                 stringify = JSON.stringify;
+//                 parse = JSON.parse;
+//             } else {
+//                 validate = v => Object.getPrototypeOf(v).constructor === propType 
+//                     ? '' 
+//                     : `invalid ${propType.name}`;
+//                 stringify = JSON.stringify;
+//                 parse = v => {
+//                     try {
+//                         const entries = convertToEntriesRecursively(JSON.parse(v));
+//                         return createRecursively(propType as Constructor, entries);
+//                     } catch (_) {
+//                         return undefined;
+//                     }
+//                 };
+//             }
+//     }
+
+//     return {
+//         type: propType,
+//         validate,
+//         stringify,
+//         parse,
+//     };
+// }
+
+export function convertToEntries(obj: object): [string | symbol | number, any][] {
+    if (typeof (obj as any).toEntries === 'function') {
+        return (obj as any).toEntries();
+    }
+    // While a custom method `toEntries` (see above) may include symbol keys, the default
+    // implementation does not. Hence the function return type is broader than the type of the
+    // following array.
+    const entries: [string | number, any][] = [];
+    if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+            entries.push([i, obj[i]]);
+        }
+    } else {
+        for (const k in obj) {
+            // exclude methods
+            if (typeof (obj as any)[k] !== 'function') {
+                entries.push([k, (obj as any)[k]]);
+            }
+        }
+    }
+    return entries;
+}
+
+export function convertToEntriesRecursively(obj: object): [(string | symbol | number)[], any][] {
+    const entries: [(string | symbol | number)[], any][] = [];
+    for (const [key, value] of convertToEntries(obj)) {
+        if ((obj as any)[key] && typeof (obj as any)[key] === 'object') {
+            const childEntries = convertToEntriesRecursively(value);
+            for (const [keyTail, simpleValue] of childEntries) {
+                entries.push([[key, ...keyTail], simpleValue]);
+            }
+        } else {
+            entries.push([[key], value]);
+        }
+    }
+    return entries;
 }
 
 export function createFromEntries<T>(ctor: Constructor<T>, entries: [string | symbol, any][]): T | undefined {

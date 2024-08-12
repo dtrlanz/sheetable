@@ -1,38 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <style>
-        h1 {
-            font-size: large;
-            cursor: pointer;
-        }
-        .collapsed div {
-            display: none;
-        }
-        .passed h1 {
-            color: green;
-        }
-        .failed h1 {
-            color: red;
-        }
-        .test div {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: medium;
-            border-left: 2px solid grey;
-            padding-left: 10px;
-        }
-        .result {
-            font-weight: bold;
-        }
-        .stack {
-            color: grey;
-            font-size: smaller;
-        }
-    </style>
+    <link rel="stylesheet" href="client.css">
 </head>
 <body>
+    <div id="ui-parent"><div id="ui"></div></div>
     <div id="tests"></div>
     <script type="module">
+        // polyfill for decorator metadata
+        Symbol.metadata ??= Symbol("Symbol.metadata");
+
         const url = '<?= spreadsheet.url ?>';
 
         import { display } from "./test";
@@ -40,7 +17,8 @@
 
         //import "../types.ts";
         //import "../sheet-navigation.ts";
-        import "../client.ts";
+        //import "../client.ts";
+        import "../component.ts";
     </script>
 </body>
 </html>

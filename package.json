@@ -1,9 +1,10 @@
 {
   "type": "module",
   "devDependencies": {
-    "@dtrlanz/gas-bundler": "^0.2.0",
+    "@dtrlanz/gas-bundler": "^0.3.3",
     "@types/google.script.client-side": "^0.1.5",
-    "ava": "^5.3.1"
+    "ava": "^5.3.1",
+    "jsdom": "^24.0.0"
   },
   "name": "@dtrlanz/sheetable",
   "description": "Utility for reading & writing tables in Sheets using Google Apps Script",

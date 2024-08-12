@@ -1,11 +1,11 @@
 import { getIndexKeys } from "./index.js";
-import { MetaProperty, Constructor } from "./meta-props.js";
+import { MetaProperty, Constructor, MetaPropReader } from "./meta-props.js";
 import { createFromEntries, getPropConstructor } from "./type.js";
 import { isScalar } from "./values.js";
 
-const titleProp = new MetaProperty<string | string[]>('title');
-const spreadProp = new MetaProperty<boolean>('spread');
-const restProp = new MetaProperty<boolean>('rest');
+const titleProp = new MetaProperty<string | string[] | undefined>('title', undefined);
+const spreadProp = new MetaProperty<boolean>('spread', false);
+const restProp = new MetaProperty<boolean>('rest', false);
 
 export const spread = spreadProp.getDecorator(true);
 export const rest = restProp.getDecorator(true);
@@ -21,17 +21,17 @@ export function title(title: string, ...rest: string[]) {
 export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, includeRest: boolean = true): [key: (string | symbol | number)[], title: string[]][] {
     const ctor = Object.getPrototypeOf(obj).constructor;
     const sample = createFromEntries(ctor, []) as object;
-    const toBeSpread = new Set(spreadProp.getReader(context).list(ctor));
-    const restList = restProp.getReader(context).list(obj);
+    const mpReader = new MetaPropReader(ctor, context);
+    const toBeSpread = new Set(mpReader.list(spreadProp));
+    const restList = mpReader.list(restProp);
     if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
     const restKey = restList.at(0);
-    const titleReader = titleProp.getReader(context);
 
     // `enumerableProps` includes, more specifically, own enumerable string-keyed properties
     const enumerableProps = Object.entries(obj)
-        .map(([key, value]) => [key, value, titleReader.get(obj, key)] as const);
+        .map(([key, value]) => [key, value, mpReader.get(titleProp, key)] as const);
     // `titleProps` includes all properties with @title decorator not included in `enumerableProps`
-    const titleProps = titleReader.entries(ctor)
+    const titleProps = mpReader.entries(titleProp)
         .filter(([key]) => (typeof key === 'symbol' && key in obj || !Object.getOwnPropertyDescriptor(obj, key)?.enumerable))
         .map(([key, title]) => [key, (obj as any)[key], title] as const);
 
@@ -143,17 +143,17 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
 export function getObjectPath(title: string[], obj: object | Constructor, context?: { [k: string]: any }, includeRest: boolean = true): (string | symbol | number)[] | undefined {
     if (title.length === 0) return [];
 
-    // TODO: cache this stuff
-    const toBeSpread = new Set(spreadProp.getReader(context).list(obj));
-    const restList = restProp.getReader(context).list(obj);
+    const mpReader = new MetaPropReader(obj, context);
+    const toBeSpread = new Set(mpReader.list(spreadProp));
+    const restList = mpReader.list(restProp);
     if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
     const restKey = restList.at(0);
     if (restKey && !toBeSpread.has(restKey)) {
         console.warn('@rest decorator is ignored unless accompanied by @spread');
     }
     const map: Map<string, { key: string | symbol, idx?: number }> = new Map();
-    const titlePropReader = titleProp.getReader(context);
-    for (const [key, value] of titlePropReader.entries(obj)) {
+    for (const [key, value] of mpReader.entries(titleProp)) {
+        if (!value) continue;
         if (typeof value === 'string') {
             // only one title provided
             // - if spread: assume this is an object, use object's properties in place of current
@@ -190,7 +190,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
             // Next try members of properties with @spread decorator.
             for (const key of toBeSpread) {
                 // exclude properties with array spreading (only interested in object spreading here)
-                if (typeof titlePropReader.get(obj, key) === 'object') continue;
+                if (typeof mpReader.get(titleProp, key) === 'object') continue;
 
                 const nextObj = objOrPrototype[key];
                 if (nextObj && typeof nextObj === 'object') {
@@ -246,9 +246,9 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
 
 export function getIndexTitles(ctor: Constructor, context?: { readonly [k: string]: any }): string[] {
     const keys = getIndexKeys(ctor, context);
-    const titleReader = titleProp.getReader(context);
+    const mpReader = new MetaPropReader(ctor, context);
     return keys.map(k => {
-        const title = titleReader.get(ctor, k);
+        const title = mpReader.get(titleProp, k);
         if (title === undefined && typeof k === 'symbol') {
             throw new Error(`symbol-keyed property ${k.toString()} cannot be used as index unless it also has a string title`);
         }
