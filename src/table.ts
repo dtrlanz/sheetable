@@ -232,6 +232,7 @@ export class Table<T extends object> {
     async getRaw(rowOffset: number) {
         const row = this.header.firstRow + this.header.rowCount + rowOffset;
         const [rowData] = await this.client.readRows(row, row + 1);
+        if (!rowData) return undefined;
         const entries: [(string | symbol | number)[], any][] = [];
         for (let colIdx = 0; colIdx < rowData.length; colIdx++) {
             const keyTuple = this.header.getKeyForColumns(this.header.firstCol + colIdx);
@@ -244,6 +245,7 @@ export class Table<T extends object> {
     }
 
     async setRaw(rowOffset: number, record: Object) {
+        const row = this.header.firstRow + this.header.rowCount + rowOffset;
         const keyTuples: (string | symbol | number)[][] = [];
         for (let colIdx = 0; colIdx < this.header.colCount; colIdx++) {
             const kt = this.header.getKeyForColumns(this.header.firstCol + colIdx);
@@ -252,13 +254,25 @@ export class Table<T extends object> {
         }
         const rowData = [];
         for (const kt of keyTuples) {
-            let obj = record;
-            let value: any;
+            let value: any = record;
             for (const key of kt) {
-                
+                if (value && typeof value === 'object') {
+                    value = value[key];
+                } else {
+                    value = undefined;
+                    break;
+                }
+            }
+            rowData.push(value);
+        }
+        await this.client.writeRows(row, [rowData]);
+        for (const s of this.slots) {
+            if (row === s.row) {
+                s.cached === undefined;
+                // already saved directly (bypassing cache)
+                s.changed = this.changes.saved;
             }
         }
-
     }
 
     async save({ changesOnly = true, timeout = 30000, retryLimit = 1 }: {
