@@ -229,6 +229,38 @@ export class Table<T extends object> {
         return slot.idx;
     }
 
+    async getRaw(rowOffset: number) {
+        const row = this.header.firstRow + this.header.rowCount + rowOffset;
+        const [rowData] = await this.client.readRows(row, row + 1);
+        const entries: [(string | symbol | number)[], any][] = [];
+        for (let colIdx = 0; colIdx < rowData.length; colIdx++) {
+            const keyTuple = this.header.getKeyForColumns(this.header.firstCol + colIdx);
+            if (!keyTuple) continue;
+            entries.push([keyTuple, rowData[colIdx]]);
+        }
+        const obj = createRecursively(Object, entries);
+        if (Array.isArray(obj)) throw new Error(`unexpected array when constructing element`);
+        return obj;
+    }
+
+    async setRaw(rowOffset: number, record: Object) {
+        const keyTuples: (string | symbol | number)[][] = [];
+        for (let colIdx = 0; colIdx < this.header.colCount; colIdx++) {
+            const kt = this.header.getKeyForColumns(this.header.firstCol + colIdx);
+            if (!kt) continue;
+            keyTuples.push(kt);
+        }
+        const rowData = [];
+        for (const kt of keyTuples) {
+            let obj = record;
+            let value: any;
+            for (const key of kt) {
+                
+            }
+        }
+
+    }
+
     async save({ changesOnly = true, timeout = 30000, retryLimit = 1 }: {
         changesOnly?: boolean,
         timeout?: number,
