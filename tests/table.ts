@@ -323,4 +323,49 @@ test('set raw', async t => {
     const table = await Table.open(Test, { client });
     await table.setRaw(0, toObj(30));
     t.deepEqual(await table.at(0), await table.at(3));
-})
+});
+
+test('front matter', async t => {
+    // Open table with front matter
+    const table0 = await Table.open(Test, { 
+        client, 
+        frontMatterRowCount: 2      // treat first 2 rows as front matter (i.e., ignore them)
+    });
+    // retrieve nth item
+    for (let i = 0; i < 5; i++) {
+        t.deepEqual(await table0.at(i), toObj((i + 2) * 10));
+    }
+    // end of table
+    t.is(await table0.at(5), undefined);
+
+    // Create table with front matter
+    const data = [0, 1, 2, 3, 4, 5, 6].map(i => toObj(i * 10));
+    const table1 = Table.create(data, { 
+        client: SheetClient.fromSheet(sheet``),
+        frontMatterRowCount: 1,     // treat first row as front matter (i.e., ignore it)
+    });
+    // retrieve nth item
+    for (let i = 0; i < 7; i++) {
+        t.deepEqual(await table1.at(i), toObj(i * 10));
+    }
+    t.is(await table1.at(7), undefined);
+    // // get front matter
+    // t.deepEqual(await table1.getRaw(0), {
+    //     a: {
+    //         a1: undefined,
+    //         a2: undefined,
+    //     },
+    //     b: undefined,
+    //     c: {
+    //         c1: undefined,
+    //         c2: {
+    //             c21: undefined,
+    //             c22: undefined,
+    //             c23: undefined,
+    //         },
+    //     },
+    //     d: undefined,
+    //     e: { e1: { e11: undefined }},
+    //     f: undefined,
+    // });
+});

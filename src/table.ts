@@ -17,6 +17,7 @@ type TableOptions = {
     firstHeaderRow?: number,
     firstDataRow?: number,
     dataRowCount?: number,
+    frontMatterRowCount?: number,
     firstColumn?: number,
     columnCount?: number,
     sharedIndex?: Table<any>,
@@ -81,7 +82,13 @@ export class Table<T extends object> {
 
         // Initialize index
         let row = data.rowOffset;
+        const frontMatterRowCount = options?.frontMatterRowCount ?? 0;
         for (const idxValues of index.getIndexedPropsFromRows(data.rows, data.colNumbers)) {
+            // skip front matter
+            if (row < data.rowOffset + frontMatterRowCount) {
+                row++;
+                continue;
+            }
             // Note that initialization might be unsuccessful (in case of index collisions)
             index.init(idxValues, () => {
                 // increment `idx` only if element is actually initialized
@@ -139,7 +146,8 @@ export class Table<T extends object> {
         );
 
         // Initialize index
-        let row = header.firstRow + header.rowCount;
+        const frontMatterRowCount = options?.frontMatterRowCount ?? 0;
+        let row = header.firstRow + header.rowCount + frontMatterRowCount;
         for (const [idxValues, obj] of index.getIndexedPropsFromObjects(data)) {
             // Note that initialization might be unsuccessful (in case of index collisions)
             index.init(idxValues, () => {
