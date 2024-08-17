@@ -213,6 +213,7 @@ function html2object(html: HTMLElement) {
 test.only('simple UI component', t => {
     const dom = new JSDOM('');
     global.document = dom.window.document;
+    global.DocumentFragment = dom.window.DocumentFragment;
 
     class A {
         @title('Foo')
@@ -243,11 +244,11 @@ test.only('simple UI component', t => {
                 tag: 'input',
                 children: [],
             }, {
-                tag: 'label',
-                children: ['Bar'],
-            }, {
                 tag: 'input',
                 children: [],
+            }, {
+                tag: 'label',
+                children: ['Bar'],
             }]
         }, {
             tag: 'label',
