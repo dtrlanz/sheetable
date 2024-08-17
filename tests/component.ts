@@ -244,11 +244,12 @@ test.only('simple UI component', t => {
                 tag: 'input',
                 children: [],
             }, {
-                tag: 'input',
-                children: [],
-            }, {
                 tag: 'label',
-                children: ['Bar'],
+                children: [{
+                    tag: 'input',
+                    children: [],
+                }, 'Bar',
+                ],
             }]
         }, {
             tag: 'label',

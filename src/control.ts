@@ -71,7 +71,8 @@ function wrapControlFactory(controlFactory: (id: string) => HTMLElement | Docume
         if (typeof labels === 'string') {
             control.setAttribute('aria-labelledby', labels);
         } else if (control.type === 'checkbox' || control.type === 'radio') {
-            html.append(labels);
+            labels.prepend(html);
+            html.replaceChildren(labels);
         } else {
             html.prepend(labels);
         }
