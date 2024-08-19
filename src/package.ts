@@ -5,6 +5,6 @@ export * from "./meta-props.js";
 export * from "./server.js";
 export * from "./sheet-navigation.js";
 export * from "./table.js";
-export * from "./title.js";
+export * from "./label.js";
 export * from "./type.js";
 export * from "./values.js";

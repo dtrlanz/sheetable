@@ -3,7 +3,7 @@ import { sheet } from "./util/sheet-navigation.js";
 
 import { Header, Branch, getHeadersHelper } from '../src/headers.js';
 import { Region, TableWalker } from "../src/sheet-navigation.js";
-import { title } from "../src/title.js";
+import { label } from "../src/label.js";
 
 
 
@@ -34,20 +34,20 @@ function br(label: string, row: number, start: number, stop: number, ...children
 
 test('read header', t => {
     class Person {
-        @title('First Name')
+        @label('First Name')
         firstName = '';
 
-        @title('Last Name')
+        @label('Last Name')
         lastName = '';
     }
     class Book {
-        @title('Title')
+        @label('Title')
         title = '';
 
-        @title('Author')
+        @label('Author')
         author = new Person();
 
-        @title('Year')
+        @label('Year')
         year = 0;
     }
 

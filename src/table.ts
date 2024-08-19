@@ -4,7 +4,7 @@ import { Orientation } from "./sheet-navigation.js";
 import { SheetClient, SpreadsheetClient } from "./client.js";
 import { Index, getIndexKeys } from "./index.js";
 import { Header } from "./headers.js";
-import { getIndexTitles } from "./title.js";
+import { getIndexLabels } from "./label.js";
 import { createFromEntries, createRecursively } from "./type.js";
 import { fromSendable } from "./values.js";
 
@@ -66,7 +66,7 @@ export class Table<T extends object> {
         const client = options?.client ?? 
             new SpreadsheetClient(options?.url).getSheet(options?.sheetName, options?.orientation);
 
-        const { headers, data } = await client.readTable(getIndexTitles(ctor));
+        const { headers, data } = await client.readTable(getIndexLabels(ctor));
         if (!data) throw new Error('client failed to return index data');
 
         // Create data structures for header, index, and table

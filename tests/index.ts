@@ -1,6 +1,6 @@
 import test from 'ava';
 import { index, getIndexKeys, TupleMap, Index } from "../src/index.js";
-import { title, getIndexTitles } from "../src/title.js";
+import { label, getIndexLabels } from "../src/label.js";
 import { sheet } from './util/sheet-navigation.js';
 import { SheetClient } from '../src/client.js';
 import { Header } from '../src/headers.js';
@@ -16,17 +16,17 @@ test('get keys and titles for simple index', t => {
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(A), ['foo']);
-    t.deepEqual(getIndexTitles(A), ['foo']);
+    t.deepEqual(getIndexLabels(A), ['foo']);
 
     class B {
-        @index @title('Foo')
+        @index @label('Foo')
         foo = 1;
         bar = 2;
         baz = 3;
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(B), ['foo']);
-    t.deepEqual(getIndexTitles(B), ['Foo']);
+    t.deepEqual(getIndexLabels(B), ['Foo']);
 
     class C {
         foo = 1;
@@ -36,17 +36,17 @@ test('get keys and titles for simple index', t => {
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(C), ['bar']);
-    t.deepEqual(getIndexTitles(C), ['bar']);
+    t.deepEqual(getIndexLabels(C), ['bar']);
 
     class D {
         foo = 1;
-        @index @title('Bar')
+        @index @label('Bar')
         bar = 2;
         baz = 3;
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(D), ['bar']);
-    t.deepEqual(getIndexTitles(D), ['Bar']);
+    t.deepEqual(getIndexLabels(D), ['Bar']);
 
     class E {
         foo = 1;
@@ -56,17 +56,17 @@ test('get keys and titles for simple index', t => {
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(E), [sym]);
-    t.throws(() => getIndexTitles(E));
+    t.throws(() => getIndexLabels(E));
 
     class F {
         foo = 1;
         bar = 2;
         baz = 3;
-        @index @title('Sym')
+        @index @label('Sym')
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(F), [sym]);
-    t.deepEqual(getIndexTitles(F), ['Sym']);
+    t.deepEqual(getIndexLabels(F), ['Sym']);
 });
 
 test('get keys and titles for tuple index', t => {
@@ -81,10 +81,10 @@ test('get keys and titles for tuple index', t => {
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(A), ['foo', 'bar']);
-    t.deepEqual(getIndexTitles(A), ['foo', 'bar']);
+    t.deepEqual(getIndexLabels(A), ['foo', 'bar']);
 
     class B {
-        @index @title('Foo')
+        @index @label('Foo')
         foo = 1;
         @index
         bar = 2;
@@ -92,30 +92,30 @@ test('get keys and titles for tuple index', t => {
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(B), ['foo', 'bar']);
-    t.deepEqual(getIndexTitles(B), ['Foo', 'bar']);
+    t.deepEqual(getIndexLabels(B), ['Foo', 'bar']);
 
     class C {
         foo = 1;
-        @index @title('Bar')
+        @index @label('Bar')
         bar = 2;
-        @index @title('Baz')
+        @index @label('Baz')
         baz = 3;
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(C), ['bar', 'baz']);
-    t.deepEqual(getIndexTitles(C), ['Bar', 'Baz']);
+    t.deepEqual(getIndexLabels(C), ['Bar', 'Baz']);
 
     class D {
         foo = 1;
-        @index @title('Bar')
+        @index @label('Bar')
         bar = 2;
-        @index @title('Baz')
+        @index @label('Baz')
         baz = 3;
-        @index @title('Sym')
+        @index @label('Sym')
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(D), ['bar', 'baz', sym]);
-    t.deepEqual(getIndexTitles(D), ['Bar', 'Baz', 'Sym']);
+    t.deepEqual(getIndexLabels(D), ['Bar', 'Baz', 'Sym']);
 
     class E {
         @index
@@ -128,20 +128,20 @@ test('get keys and titles for tuple index', t => {
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(E), ['foo', 'bar', 'baz', sym]);
-    t.throws(() => getIndexTitles(E));
+    t.throws(() => getIndexLabels(E));
 
     class F {
-        @index @title('Foo')
+        @index @label('Foo')
         foo = 1;
-        @index @title('Bar')
+        @index @label('Bar')
         bar = 2;
-        @index @title('Baz')
+        @index @label('Baz')
         baz = 3;
-        @index @title('Sym')
+        @index @label('Sym')
         [sym] = 4;
     }
     t.deepEqual(getIndexKeys(F), ['foo', 'bar', 'baz', sym]);
-    t.deepEqual(getIndexTitles(F), ['Foo', 'Bar', 'Baz', 'Sym']);
+    t.deepEqual(getIndexLabels(F), ['Foo', 'Bar', 'Baz', 'Sym']);
 });
 
 test('tuple map', t => {

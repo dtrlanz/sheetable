@@ -1,5 +1,5 @@
 import { Constructor, MetaPropReader, MetaProperty } from "./meta-props.js";
-import { getKeysWithTitles, title } from "./title.js";
+import { getKeysWithLabels, label } from "./label.js";
 import { validateProp, stringifyProp, parseProp } from "./type.js";
 import { Control, controlProp } from "./control.js";
 
@@ -73,7 +73,7 @@ export class Component<T extends object | object[] = any> {
         const sample = Array.isArray(this.data)
             ? (this.data[0] ?? new this.ctor())
             : this.data;
-        const structure = getKeysWithTitles(sample, this.context);
+        const structure = getKeysWithLabels(sample, this.context);
 
         if (!Array.isArray(this.data)) {
             // only one record of data, so we're done

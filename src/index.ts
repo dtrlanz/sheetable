@@ -1,6 +1,6 @@
 import { Header } from "./headers.js";
 import { Constructor, MetaPropReader, MetaProperty } from "./meta-props.js";
-import { getIndexTitles } from "./title.js";
+import { getIndexLabels } from "./label.js";
 import { flattenEntries } from "./type.js";
 import { Scalar } from "./values.js";
 
@@ -33,7 +33,7 @@ export class Index<T extends object, V> {
         // TODO: avoid calling getIndexKeys() twice
         // (thrice, actually, if calling from `Table.open()`)
         this.indexKeys = getIndexKeys(ctor, context);
-        this.indexTitles = getIndexTitles(ctor, context);
+        this.indexTitles = getIndexLabels(ctor, context);
     }
 
     *getIndexedPropsFromObjects(objects: Iterable<T>): Iterable<[any[], T]> {

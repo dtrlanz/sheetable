@@ -1,6 +1,6 @@
 import { Constructor } from "./meta-props.js";
 import { Region, TableWalker } from "./sheet-navigation.js";
-import { getKeysWithTitles, getObjectPath } from "./title.js";
+import { getKeysWithLabels, getObjectPath } from "./label.js";
 
 export class Header<T> {
     readonly ctor: Constructor<T>;
@@ -41,7 +41,7 @@ export class Header<T> {
     ): Header<T> {
         const branches: Branch[] = [];
         for (const obj of samples) {
-            for (const [_, title] of getKeysWithTitles(obj, context)) {
+            for (const [_, title] of getKeysWithLabels(obj, context)) {
                 addBranch(branches, firstRow, title);
             }
         }

@@ -3,22 +3,22 @@ import { MetaProperty, Constructor, MetaPropReader } from "./meta-props.js";
 import { createFromEntries, getPropConstructor } from "./type.js";
 import { isScalar } from "./values.js";
 
-const titleProp = new MetaProperty<string | string[] | undefined>('title', undefined);
+const labelProp = new MetaProperty<string | string[] | undefined>('label', undefined);
 const spreadProp = new MetaProperty<boolean>('spread', false);
 const restProp = new MetaProperty<boolean>('rest', false);
 
 export const spread = spreadProp.getDecorator(true);
 export const rest = restProp.getDecorator(true);
 
-export function title(title: string, ...rest: string[]) {
+export function label(label: string, ...rest: string[]) {
     if (rest.length === 0) {
-        return titleProp.getDecorator(title);
+        return labelProp.getDecorator(label);
     } else {
-        return titleProp.getDecorator([title, ...rest]);
+        return labelProp.getDecorator([label, ...rest]);
     }
 }
 
-export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, includeRest: boolean = true): [key: (string | symbol | number)[], title: string[]][] {
+export function getKeysWithLabels(obj: object, context?: { [k: string]: any }, includeRest: boolean = true): [key: (string | symbol | number)[], label: string[]][] {
     const ctor = Object.getPrototypeOf(obj).constructor;
     const sample = createFromEntries(ctor, []) as object;
     const mpReader = new MetaPropReader(ctor, context);
@@ -29,17 +29,17 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
 
     // `enumerableProps` includes, more specifically, own enumerable string-keyed properties
     const enumerableProps = Object.entries(obj)
-        .map(([key, value]) => [key, value, mpReader.get(titleProp, key)] as const);
-    // `titleProps` includes all properties with @title decorator not included in `enumerableProps`
-    const titleProps = mpReader.entries(titleProp)
+        .map(([key, value]) => [key, value, mpReader.get(labelProp, key)] as const);
+    // `labelProps` includes all properties with @label decorator not included in `enumerableProps`
+    const labelProps = mpReader.entries(labelProp)
         .filter(([key]) => (typeof key === 'symbol' && key in obj || !Object.getOwnPropertyDescriptor(obj, key)?.enumerable))
-        .map(([key, title]) => [key, (obj as any)[key], title] as const);
+        .map(([key, label]) => [key, (obj as any)[key], label] as const);
 
-    const arr: [key: (string | symbol | number)[], title: string[]][] = [];
-    for (let [key, value, title] of [...enumerableProps, ...titleProps]) {
-        // assigning the empty string as title excludes the property
+    const arr: [key: (string | symbol | number)[], label: string[]][] = [];
+    for (let [key, value, label] of [...enumerableProps, ...labelProps]) {
+        // assigning the empty string as label excludes the property
         // (This is a temporary workaround until we have a more general solution.)
-        if (title === '') continue;
+        if (label === '') continue;
 
         // Known properties are those which are present in a default instance.
         // Unknown properties are only included in results if `includeRest === true` 
@@ -55,32 +55,32 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
             }
             if (toBeSpread.has(key)) {
                 if (Array.isArray(value)) {
-                    // When spreading arrays, multiple titles are expected
-                    if (Array.isArray(title)) {
+                    // When spreading arrays, multiple labels are expected
+                    if (Array.isArray(label)) {
                         // Process arrays item by item
-                        for (let i = 0; i < title.length && i < value.length; i++) {
+                        for (let i = 0; i < label.length && i < value.length; i++) {
                             if (!isScalar(value[i])) {
-                                // Get keys & titles of nested object recursively
-                                for (const [keyTail, titleTail] of getKeysWithTitles(value[i], context)) {
-                                    arr.push([[key, i, ...keyTail], [title[i], ...titleTail]]);
+                                // Get keys & labels of nested object recursively
+                                for (const [keyTail, labelTail] of getKeysWithLabels(value[i], context)) {
+                                    arr.push([[key, i, ...keyTail], [label[i], ...labelTail]]);
                                 }
                             } else {
                                 // Non-complex value, no recursion needed
-                                arr.push([[key, i], [title[i]]]);
+                                arr.push([[key, i], [label[i]]]);
                             }
                         }
                     } else {
                         // on import, data would not be recognized as array
-                        throw new Error(`array spreading requires multiple titles, e.g., @title('Title 1', 'Title 2', ...): { ${String(key)}: ${value} }`);
+                        throw new Error(`array spreading requires multiple labels, e.g., @label('Label 1', 'Label 2', ...): { ${String(key)}: ${value} }`);
                     }
                 } else {
-                    if (Array.isArray(title)) {
-                        // title arrays are only relevant for array spreading, not for object spreading
-                        console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored for non-array objects.`);
+                    if (Array.isArray(label)) {
+                        // label arrays are only relevant for array spreading, not for object spreading
+                        console.warn(`Additional labels [${label.slice(1).join(', ')}] are ignored for non-array objects.`);
                     }
-                    // Get keys & titles of nested object recursively
-                    for (const [keyTail, titleTail] of getKeysWithTitles(value, context, includeRest && key === restKey)) {
-                        arr.push([[key, ...keyTail], titleTail]);
+                    // Get keys & labels of nested object recursively
+                    for (const [keyTail, labelTail] of getKeysWithLabels(value, context, includeRest && key === restKey)) {
+                        arr.push([[key, ...keyTail], labelTail]);
                     }
                 }
             } else {
@@ -88,32 +88,32 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
                     // @rest decorator without @spread is ignored
                     console.warn(`@rest decorator is ignored unless accompanied by @spread: { ${String(key)}: ${value} }`);
                 } 
-                if (Array.isArray(title)) {
-                    // non-initial titles are ignored without @spread
-                    console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
-                    title = title[0];
+                if (Array.isArray(label)) {
+                    // non-initial labels are ignored without @spread
+                    console.warn(`Additional labels [${label.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                    label = label[0];
                 }
-                // `enumerableProps` contains only string keys; symbolProps contains only keys with valid title string
-                if (title === undefined && typeof key === 'symbol') throw new Error('unreachable');
-                title ??= key as string;
+                // `enumerableProps` contains only string keys; symbolProps contains only keys with valid label string
+                if (label === undefined && typeof key === 'symbol') throw new Error('unreachable');
+                label ??= key as string;
                 // Just a nested object (no array/object spreading involved)
                 if (Array.isArray(value)) {
                     // Process arrays item by item
                     for (let i = 0; i < value.length; i++) {
                         if (!isScalar(value[i])) {
-                            // Get keys & titles of nested object recursively
-                            for (const [keyTail, titleTail] of getKeysWithTitles(value[i], context)) {
-                                arr.push([[key, i, ...keyTail], [title, `${i}`, ...titleTail]]);
+                            // Get keys & labels of nested object recursively
+                            for (const [keyTail, labelTail] of getKeysWithLabels(value[i], context)) {
+                                arr.push([[key, i, ...keyTail], [label, `${i}`, ...labelTail]]);
                             }
                         } else {
                             // Non-complex value, no recursion needed
-                            arr.push([[key, i], [title, `${i}`]]);
+                            arr.push([[key, i], [label, `${i}`]]);
                         }
                     }
                 } else {
-                    // Get keys & titles of nested object recursively
-                    for (const [keyTail, titleTail] of getKeysWithTitles(value, context)) {
-                        arr.push([[key, ...keyTail], [title, ...titleTail]]);
+                    // Get keys & labels of nested object recursively
+                    for (const [keyTail, labelTail] of getKeysWithLabels(value, context)) {
+                        arr.push([[key, ...keyTail], [label, ...labelTail]]);
                     }
                 }
             }
@@ -121,7 +121,7 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
         } else {
             // Non-complex types (i.e., primitive types & Date)
             if (toBeSpread.has(key)) {
-                // @spread decorator would cause re-import to ignore title
+                // @spread decorator would cause re-import to ignore label
                 throw new Error(`@spread cannot be applied to scalar value: { ${String(key)}: ${String(value)} }`);
             }
             if (restKey === key) {
@@ -129,23 +129,23 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
                 // would not cause re-import to fail, so a warning is sufficient here
                 console.warn(`@rest decorator is ignored unless accompanied by @spread: { ${String(key)}: ${String(value)} }`);
             } 
-            if (Array.isArray(title)) {
-                // non-initial titles are ignored without @spread
+            if (Array.isArray(label)) {
+                // non-initial labels are ignored without @spread
                 // would not cause re-import to fail, so a warning is sufficient here
-                console.warn(`Additional titles [${title.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
-                title = title[0];
+                console.warn(`Additional labels [${label.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                label = label[0];
             }
-            // `enumerableProps` contains only string keys; symbolProps contains only keys with valid title string
-            if (title === undefined && typeof key === 'symbol') throw new Error('unreachable');
-            title ??= key as string;
-            arr.push([[key], [title]]);
+            // `enumerableProps` contains only string keys; symbolProps contains only keys with valid label string
+            if (label === undefined && typeof key === 'symbol') throw new Error('unreachable');
+            label ??= key as string;
+            arr.push([[key], [label]]);
         }
     }
     return arr;
 }
 
-export function getObjectPath(title: string[], obj: object | Constructor, context?: { [k: string]: any }, includeRest: boolean = true): (string | symbol | number)[] | undefined {
-    if (title.length === 0) return [];
+export function getObjectPath(label: string[], obj: object | Constructor, context?: { [k: string]: any }, includeRest: boolean = true): (string | symbol | number)[] | undefined {
+    if (label.length === 0) return [];
 
     const mpReader = new MetaPropReader(obj, context);
     const toBeSpread = new Set(mpReader.list(spreadProp));
@@ -156,10 +156,10 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
         console.warn('@rest decorator is ignored unless accompanied by @spread');
     }
     const map: Map<string, { key: string | symbol, idx?: number }> = new Map();
-    for (const [key, value] of mpReader.entries(titleProp)) {
+    for (const [key, value] of mpReader.entries(labelProp)) {
         if (!value) continue;
         if (typeof value === 'string') {
-            // only one title provided
+            // only one label provided
             // - if spread: assume this is an object, use object's properties in place of current
             //   property (no action needed right now)
             // - otherwise: store property key
@@ -167,38 +167,38 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
                 map.set(value, { key });
             }
         } else {
-            // several titles provided
-            // - if spread: assume this is an array, use title list as titles of array items
-            // - otherwise: use first title, ignore rest (emit warning)
+            // several labels provided
+            // - if spread: assume this is an array, use label list as labels of array items
+            // - otherwise: use first label, ignore rest (emit warning)
             if (toBeSpread.has(key)) {
                 for (let idx = 0; idx < value.length; idx++) {
                     map.set(value[idx], { key, idx })
                 }
             } else {
-                console.warn(`Additional titles [${value.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
+                console.warn(`Additional labels [${value.slice(1).join(', ')}] are ignored unless @spread decorator is also applied.`);
                 map.set(value[0], { key });
             }
         }
     }
 
-    let found = map.get(title[0]);
+    let found = map.get(label[0]);
     if (!found) {
-        // Title mapping not defined. Try using title directly as property key.
+        // Label mapping not defined. Try using label directly as property key.
         // TODO: check this (seems wild)
         const objOrPrototype = typeof obj === 'object' ? obj : Object.getPrototypeOf(obj);
-        if (title[0] in objOrPrototype) {
-            found ??= { key: title[0] };
+        if (label[0] in objOrPrototype) {
+            found ??= { key: label[0] };
         }
         if (!found) {
             // Property not found on this object.
             // Next try members of properties with @spread decorator.
             for (const key of toBeSpread) {
                 // exclude properties with array spreading (only interested in object spreading here)
-                if (typeof mpReader.get(titleProp, key) === 'object') continue;
+                if (typeof mpReader.get(labelProp, key) === 'object') continue;
 
                 const nextObj = objOrPrototype[key];
                 if (nextObj && typeof nextObj === 'object') {
-                    const path = getObjectPath(title, nextObj, context, includeRest && key === restKey);
+                    const path = getObjectPath(label, nextObj, context, includeRest && key === restKey);
                     if (path) {
                         return [key, ...path];
                     }
@@ -206,17 +206,17 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
             }
             // No match found.
             if (!found) {
-                // If unmatched titles should be retained, default to using title as key.
-                return includeRest ? title : undefined;
+                // If unmatched labels should be retained, default to using label as key.
+                return includeRest ? label : undefined;
             }
         }
     }
     const { key, idx } = found;
 
-    // Matching property was found for title[0]. Now process rest of title array.
-    // Use title as fallback if further matching does not succeed.
-    let tail: (string | symbol | number)[] = title.slice(1);
-    if (title.length > 1) {
+    // Matching property was found for label[0]. Now process rest of label array.
+    // Use label as fallback if further matching does not succeed.
+    let tail: (string | symbol | number)[] = label.slice(1);
+    if (label.length > 1) {
         let nextObj: object | Constructor | undefined;
         if (typeof obj === 'object') {
             let val = (obj as any)[key];
@@ -234,7 +234,7 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
             nextObj = getPropConstructor(obj, key);
         }
         if (nextObj) {
-            const nextPath = getObjectPath(title.slice(1), nextObj, context, false);
+            const nextPath = getObjectPath(label.slice(1), nextObj, context, false);
             if (nextPath) {
                 tail = nextPath;
             }
@@ -248,15 +248,15 @@ export function getObjectPath(title: string[], obj: object | Constructor, contex
     }
 }
 
-export function getIndexTitles(ctor: Constructor, context?: { readonly [k: string]: any }): string[] {
+export function getIndexLabels(ctor: Constructor, context?: { readonly [k: string]: any }): string[] {
     const keys = getIndexKeys(ctor, context);
     const mpReader = new MetaPropReader(ctor, context);
     return keys.map(k => {
-        const title = mpReader.get(titleProp, k);
-        if (title === undefined && typeof k === 'symbol') {
-            throw new Error(`symbol-keyed property ${k.toString()} cannot be used as index unless it also has a string title`);
+        const label = mpReader.get(labelProp, k);
+        if (label === undefined && typeof k === 'symbol') {
+            throw new Error(`symbol-keyed property ${k.toString()} cannot be used as index unless it also has a string label`);
         }
-        if (Array.isArray(title)) throw new Error('Properties with array titles are currently not allowed as indices');
-        return title ?? (k as string);
+        if (Array.isArray(label)) throw new Error('Properties with array labels are currently not allowed as indices');
+        return label ?? (k as string);
     });
 }

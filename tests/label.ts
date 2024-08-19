@@ -1,5 +1,5 @@
 import test from 'ava';
-import { title, spread, rest, getObjectPath, getKeysWithTitles } from "../src/title.js";
+import { label, spread, rest, getObjectPath, getKeysWithLabels } from "../src/label.js";
 
 /**
  * Note: The current implementation relies on `Object.entries()` to find an object's properties.
@@ -8,36 +8,36 @@ import { title, spread, rest, getObjectPath, getKeysWithTitles } from "../src/ti
  * decisions, incl. about enumeration order. Those decisions should be deferred until it's clear
  * what use cases cannot be adequately addressed with current workarounds.
  * 
- * The simplest workaround is to attach a string title using the `@title` decorator. Properties
- * with titles are always included and ordered after the enumerable properties. Using `@title` is
+ * The simplest workaround is to attach a string label using the `@label` decorator. Properties
+ * with labels are always included and ordered after the enumerable properties. Using `@label` is
  * necessary in any case for symbol-keyed properties, since these could not otherwise be 
  * represented in a spreadsheet.
  */
 
-test('simple title conversion', t => {
+test('simple label conversion', t => {
     class ClassA {
-        @title('Foo')
+        @label('Foo')
         foo = 3.14;
 
-        @title('Bar')
+        @label('Bar')
         accessor bar = false;
     }
 
     t.deepEqual(getObjectPath(['Foo'], ClassA), ['foo']);
     t.deepEqual(getObjectPath(['Bar'], ClassA), ['bar']);
-    t.deepEqual(getObjectPath(['Baz'], ClassA), ['Baz'], 'use title as fallback');
+    t.deepEqual(getObjectPath(['Baz'], ClassA), ['Baz'], 'use label as fallback');
 
     let objA = new ClassA();
     t.deepEqual(getObjectPath(['Foo'], objA), ['foo']);
     t.deepEqual(getObjectPath(['Bar'], objA), ['bar']);
-    t.deepEqual(getObjectPath(['Baz'], objA), ['Baz'], 'use title as fallback');
+    t.deepEqual(getObjectPath(['Baz'], objA), ['Baz'], 'use label as fallback');
 
-    t.deepEqual(getKeysWithTitles(objA), [
+    t.deepEqual(getKeysWithLabels(objA), [
         [['foo'], ['Foo']],
         [['bar'], ['Bar']],
     ]);
     (objA as any).Baz = 42;
-    t.deepEqual(getKeysWithTitles(objA), [
+    t.deepEqual(getKeysWithLabels(objA), [
         [['foo'], ['Foo']],
         [['Baz'], ['Baz']], // own enumerable string props before accessors
         [['bar'], ['Bar']],
@@ -46,30 +46,30 @@ test('simple title conversion', t => {
     objA = new ClassA();
     const mySymbol = Symbol('mySymbol');
     class ClassB {
-        @title('Apples')
+        @label('Apples')
         a = objA;
 
-        @title('Oranges')
+        @label('Oranges')
         b = 42;
 
-        @title('Bicycles')
+        @label('Bicycles')
         [mySymbol] = true;
     }
 
     const objB = new ClassB();
     t.deepEqual(getObjectPath(['Apples', 'Foo'], objB), ['a', 'foo']);
     t.deepEqual(getObjectPath(['Apples', 'Bar'], objB), ['a', 'bar']);
-    t.deepEqual(getObjectPath(['Apples', 'Baz'], objB), ['a', 'Baz'], 'use title as fallback');
+    t.deepEqual(getObjectPath(['Apples', 'Baz'], objB), ['a', 'Baz'], 'use label as fallback');
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
 
     t.deepEqual(getObjectPath(['Apples', 'Foo'], ClassB), ['a', 'foo']);
     t.deepEqual(getObjectPath(['Apples', 'Bar'], ClassB), ['a', 'bar']);
-    t.deepEqual(getObjectPath(['Apples', 'Baz'], ClassB), ['a', 'Baz'], 'use title as fallback');
+    t.deepEqual(getObjectPath(['Apples', 'Baz'], ClassB), ['a', 'Baz'], 'use label as fallback');
     t.deepEqual(getObjectPath(['Oranges'], ClassB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], ClassB), [mySymbol]);
 
-    t.deepEqual(getKeysWithTitles(objB), [
+    t.deepEqual(getKeysWithLabels(objB), [
         [['a', 'foo'], ['Apples', 'Foo']],
         [['a', 'bar'], ['Apples', 'Bar']],
         [['b'], ['Oranges']],
@@ -77,14 +77,14 @@ test('simple title conversion', t => {
     ]);
 
     class ClassC {
-        @title('Apples')
+        @label('Apples')
         a = objA;
 
-        @title('')
+        @label('')
         b = 42;
     }
     const objC = new ClassC();
-    t.deepEqual(getKeysWithTitles(objC), [
+    t.deepEqual(getKeysWithLabels(objC), [
         [['a', 'foo'], ['Apples', 'Foo']],
         [['a', 'bar'], ['Apples', 'Bar']],
     ]);
@@ -92,10 +92,10 @@ test('simple title conversion', t => {
 
 test('array spreading', t => {
     class ClassA {
-        @spread @title('A', 'B', 'C', 'D')
+        @spread @label('A', 'B', 'C', 'D')
         foo = [0, 1, 2, 3];
 
-        @title('Bar')
+        @label('Bar')
         accessor bar = false;
     }
 
@@ -105,7 +105,7 @@ test('array spreading', t => {
     t.deepEqual(getObjectPath(['D'], ClassA), ['foo', 3]);
     t.deepEqual(getObjectPath(['Bar'], ClassA), ['bar']);
 
-    t.deepEqual(getKeysWithTitles(new ClassA()), [
+    t.deepEqual(getKeysWithLabels(new ClassA()), [
         [['foo', 0], ['A']],
         [['foo', 1], ['B']],
         [['foo', 2], ['C']],
@@ -116,13 +116,13 @@ test('array spreading', t => {
     const objA = new ClassA();
     const mySymbol = Symbol('mySymbol');
     class ClassB {
-        @title('Apples')
+        @label('Apples')
         a = objA;
 
-        @title('Oranges')
+        @label('Oranges')
         b = 42;
 
-        @title('Bicycles')
+        @label('Bicycles')
         [mySymbol] = true;
     }
 
@@ -135,7 +135,7 @@ test('array spreading', t => {
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
     t.deepEqual(getObjectPath(['Bicycles'], objB), [mySymbol]);
 
-    t.deepEqual(getKeysWithTitles(objB), [
+    t.deepEqual(getKeysWithLabels(objB), [
         [['a', 'foo', 0], ['Apples', 'A']],
         [['a', 'foo', 1], ['Apples', 'B']],
         [['a', 'foo', 2], ['Apples', 'C']],
@@ -148,20 +148,20 @@ test('array spreading', t => {
 
 test('object spreading', t => {
     class ClassA {
-        @title('Foo')
+        @label('Foo')
         foo = 3.14;
 
-        @title('Bar')
+        @label('Bar')
         accessor bar = false;
     }
 
     const objA = new ClassA();
     class ClassB {
         @spread 
-        @title('Apples')    // title 'Apples' ignored because of @spread
-        a = objA;           // titles of ClassA's properties used instead
+        @label('Apples')    // label 'Apples' ignored because of @spread
+        a = objA;           // labels of ClassA's properties used instead
 
-        @title('Oranges')
+        @label('Oranges')
         b = 42;
     }
 
@@ -170,12 +170,12 @@ test('object spreading', t => {
     t.deepEqual(getObjectPath(['Bar'], objB), ['a', 'bar']);
     t.deepEqual(getObjectPath(['Oranges'], objB), ['b']);
 
-    // No corresponding annotations exist, so these titles are simply passed through
+    // No corresponding annotations exist, so these labels are simply passed through
     t.deepEqual(getObjectPath(['Apples'], objB), ['Apples']);
     t.deepEqual(getObjectPath(['Apples', 'Foo'], objB), ['Apples', 'Foo']);
     t.deepEqual(getObjectPath(['Apples', 'Bar'], objB), ['Apples', 'Bar']);
 
-    t.deepEqual(getKeysWithTitles(objB), [
+    t.deepEqual(getKeysWithLabels(objB), [
         [['a', 'foo'], ['Foo']],
         [['a', 'bar'], ['Bar']],
         [['b'], ['Oranges']],
@@ -187,7 +187,7 @@ test('object spreading', t => {
     objBB.a = objAB;
     (objBB as any).c = true;
 
-    t.deepEqual(getKeysWithTitles(objBB), [
+    t.deepEqual(getKeysWithLabels(objBB), [
         [['a', 'foo'], ['Foo']],
         [['a', 'bar'], ['Bar']],
         // cannot be included: on import, this would be assigned to `objBB.baz`
@@ -199,11 +199,11 @@ test('object spreading', t => {
 
     class ClassC {
         @spread
-        @title('Onions', 'Tomatoes')
+        @label('Onions', 'Tomatoes')
         a = [objA, objA];
 
         @spread
-        @title('Bicycles')  // title 'Bicycles' ignored because of @spread
+        @label('Bicycles')  // label 'Bicycles' ignored because of @spread
         b = objB;
     }
 
@@ -227,7 +227,7 @@ test('object spreading', t => {
     t.deepEqual(getObjectPath(['Oranges'], objC), ['b', 'b']);
     t.deepEqual(getObjectPath(['Oranges', 'Foo'], objC), ['b', 'b', 'Foo']);
 
-    t.deepEqual(getKeysWithTitles(objC), [
+    t.deepEqual(getKeysWithLabels(objC), [
         [['a', 0, 'foo'], ['Onions', 'Foo']],
         [['a', 0, 'bar'], ['Onions', 'Bar']],
         [['a', 1, 'foo'], ['Tomatoes', 'Foo']],
@@ -242,13 +242,13 @@ test('object spreading', t => {
     objCC.b = objBB;
     (objCC as any).c = 0;
 
-    t.deepEqual(getKeysWithTitles(objCC), [
+    t.deepEqual(getKeysWithLabels(objCC), [
         [['a', 0, 'foo'], ['Onions', 'Foo']],
-        // can be included: adequately identified due to array spreading titles
+        // can be included: adequately identified due to array spreading labels
         [['a', 0, 'baz'], ['Onions', 'baz']],
         [['a', 0, 'bar'], ['Onions', 'Bar']],   // order: accessors after own properties
         [['a', 1, 'foo'], ['Tomatoes', 'Foo']],
-        // can be included: adequately identified due to array spreading titles
+        // can be included: adequately identified due to array spreading labels
         [['a', 1, 'baz'], ['Tomatoes', 'baz']],
         [['a', 1, 'bar'], ['Tomatoes', 'Bar']], // order: accessors after own properties
         [['b', 'a', 'foo'], ['Foo']],
@@ -263,10 +263,10 @@ test('object spreading', t => {
 
 test('rest collection', t => {
     class ClassA {
-        @title('Foo')
+        @label('Foo')
         foo = 3.14;
 
-        @title('Bar')
+        @label('Bar')
         accessor bar = false;
     }
 
@@ -277,7 +277,7 @@ test('rest collection', t => {
     const objAA = new ClassA();
     (objAA as any).baz = 25;
 
-    t.deepEqual(getKeysWithTitles(objAA), [
+    t.deepEqual(getKeysWithLabels(objAA), [
         [['foo'], ['Foo']],
         // can be included: neither @spread nor @rest apply
         [['baz'], ['baz']],
@@ -288,7 +288,7 @@ test('rest collection', t => {
         @spread @rest
         a = objA;
 
-        @title('Apples')
+        @label('Apples')
         b = 0;
     }
 
@@ -296,9 +296,9 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Foo'], objB), ['a', 'foo']);
     t.deepEqual(getObjectPath(['Bar'], objB), ['a', 'bar']);
     t.deepEqual(getObjectPath(['Apples'], objB), ['b']);
-    t.deepEqual(getObjectPath(['Baz'], objB), ['a', 'Baz'], 'unmatched titles should be assigned to a');
+    t.deepEqual(getObjectPath(['Baz'], objB), ['a', 'Baz'], 'unmatched labels should be assigned to a');
 
-    t.deepEqual(getKeysWithTitles(objB), [
+    t.deepEqual(getKeysWithLabels(objB), [
         [['a', 'foo'], ['Foo']],
         [['a', 'bar'], ['Bar']],
         [['b'], ['Apples']],
@@ -310,7 +310,7 @@ test('rest collection', t => {
     objBB.a = objAB;
     (objBB as any).c = 0;
 
-    t.deepEqual(getKeysWithTitles(objBB), [
+    t.deepEqual(getKeysWithLabels(objBB), [
         [['a', 'foo'], ['Foo']],
         // can be included: both @spread and @rest apply
         [['a', 'baz'], ['baz']],
@@ -334,9 +334,9 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Apples'], objC), ['y', 'b']);
     t.deepEqual(getObjectPath(['Foo'], objC), ['y', 'a', 'foo']);
     t.deepEqual(getObjectPath(['Bar'], objC), ['y', 'a', 'bar']);
-    t.deepEqual(getObjectPath(['Baz'], objC), ['y', 'a', 'Baz'], 'unmatched titles should be assigned to y.a');
+    t.deepEqual(getObjectPath(['Baz'], objC), ['y', 'a', 'Baz'], 'unmatched labels should be assigned to y.a');
 
-    t.deepEqual(getKeysWithTitles(objC), [
+    t.deepEqual(getKeysWithLabels(objC), [
         [['x'], ['x']],
         [['y', 'a', 'foo'], ['Foo']],
         [['y', 'a', 'bar'], ['Bar']],
@@ -347,7 +347,7 @@ test('rest collection', t => {
     objCC.y = objBB;
     (objCC as any).z = 4;
 
-    t.deepEqual(getKeysWithTitles(objCC), [
+    t.deepEqual(getKeysWithLabels(objCC), [
         [['x'], ['x']],
         [['y', 'a', 'foo'], ['Foo']],
         // can be included: both @spread and @rest apply
@@ -372,13 +372,13 @@ test('rest collection', t => {
     t.deepEqual(getObjectPath(['Apples'], objD), ['y', 'b']);
     t.deepEqual(getObjectPath(['Foo'], objD), ['y', 'a', 'foo']);
     t.deepEqual(getObjectPath(['Bar'], objD), ['y', 'a', 'bar']);
-    t.deepEqual(getObjectPath(['Baz'], objD), ['Baz'], 'unmatched titles should be retained at top level');
+    t.deepEqual(getObjectPath(['Baz'], objD), ['Baz'], 'unmatched labels should be retained at top level');
 
     const objDD = new ClassD();
     objDD.y = objBB;
     (objDD as any).z = 4;
 
-    t.deepEqual(getKeysWithTitles(objDD), [
+    t.deepEqual(getKeysWithLabels(objDD), [
         [['x'], ['x']],
         [['y', 'a', 'foo'], ['Foo']],
         [['y', 'a', 'bar'], ['Bar']],

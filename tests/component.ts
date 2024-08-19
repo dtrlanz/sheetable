@@ -1,7 +1,7 @@
 import test from 'ava';
 import { JSDOM } from 'jsdom';
 
-import { title, spread, rest, getKeysWithTitles } from "../src/title.js";
+import { label, spread, rest, getKeysWithLabels } from "../src/label.js";
 import { Component } from "../src/component.js";
 
 
@@ -27,10 +27,10 @@ function getUiStructure(children: UiStructure): UiStructure {
 
 test('simple object structure', t => {
     class A {
-        @title('Foo')
+        @label('Foo')
         foo = 3.14;
 
-        @title('Bar')
+        @label('Bar')
         bar = false;
     }
 
@@ -48,10 +48,10 @@ test('simple object structure', t => {
     ]);
 
     class B {
-        @title('Apples')
+        @label('Apples')
         a = objA;
 
-        @title('Oranges')
+        @label('Oranges')
         b = 42;
     }
 
@@ -80,10 +80,10 @@ test('simple object structure', t => {
 
 test('array of objects', t => {
     class A {
-        @title('Foo')
+        @label('Foo')
         foo = 3.14;
 
-        @title('Bar')
+        @label('Bar')
         bar = false;
     }
 
@@ -125,10 +125,10 @@ test('array of objects', t => {
     ]);
 
     class B {
-        @title('Apples')
+        @label('Apples')
         a = objA;
 
-        @title('Oranges')
+        @label('Oranges')
         b = 42;
     }
 
@@ -216,18 +216,18 @@ test.only('simple UI component', t => {
     global.DocumentFragment = dom.window.DocumentFragment;
 
     class A {
-        @title('Foo')
+        @label('Foo')
         foo = 3.14;
 
-        @title('Bar')
+        @label('Bar')
         bar = false;
     }
 
     class B {
-        @title('Apples')
+        @label('Apples')
         a = new A();
 
-        @title('Oranges')
+        @label('Oranges')
         b = 42;
     }
 
