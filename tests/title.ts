@@ -75,6 +75,19 @@ test('simple title conversion', t => {
         [['b'], ['Oranges']],
         [[mySymbol], ['Bicycles']],
     ]);
+
+    class ClassC {
+        @title('Apples')
+        a = objA;
+
+        @title('')
+        b = 42;
+    }
+    const objC = new ClassC();
+    t.deepEqual(getKeysWithTitles(objC), [
+        [['a', 'foo'], ['Apples', 'Foo']],
+        [['a', 'bar'], ['Apples', 'Bar']],
+    ]);
 });
 
 test('array spreading', t => {

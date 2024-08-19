@@ -37,6 +37,10 @@ export function getKeysWithTitles(obj: object, context?: { [k: string]: any }, i
 
     const arr: [key: (string | symbol | number)[], title: string[]][] = [];
     for (let [key, value, title] of [...enumerableProps, ...titleProps]) {
+        // assigning the empty string as title excludes the property
+        // (This is a temporary workaround until we have a more general solution.)
+        if (title === '') continue;
+
         // Known properties are those which are present in a default instance.
         // Unknown properties are only included in results if `includeRest === true` 
         // and none of the other properties are decorated with @rest.
