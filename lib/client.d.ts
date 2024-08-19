@@ -10,6 +10,7 @@ export declare class SpreadsheetClient {
     static serverFunctionName: string;
     constructor(urlOrId?: string);
     private request;
+    getName(): string | undefined;
     getSheet(sheet?: string | {
         name?: string;
         id?: number;

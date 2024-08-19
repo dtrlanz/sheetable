@@ -12,6 +12,7 @@ type TableOptions = {
     firstHeaderRow?: number;
     firstDataRow?: number;
     dataRowCount?: number;
+    frontMatterRowCount?: number;
     firstColumn?: number;
     columnCount?: number;
     sharedIndex?: Table<any>;
@@ -48,6 +49,8 @@ export declare class Table<T extends object> {
      * @returns — the numeric index of the updated or added record
      */
     set(record: T): number;
+    getRaw(rowOffset: number): Promise<Object | undefined>;
+    setRaw(rowOffset: number, record: Object): Promise<void>;
     save({ changesOnly, timeout, retryLimit }?: {
         changesOnly?: boolean;
         timeout?: number;

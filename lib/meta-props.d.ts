@@ -1,12 +1,13 @@
 type SideEffect<T> = {
     precedence: number;
-    callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: T) => T;
+    callback: (getValue: <U>(metaProp: MetaProperty<U>) => U, input: T, getMetaPropReader: (ctor?: Constructor) => MetaPropReader, ctor: Constructor, key: string | symbol | undefined) => T;
 };
 export declare class MetaProperty<T> {
     description: string;
     defaultValue: T;
     affectedBy: SideEffect<T>[];
     constructor(desciption: string, defaultValue: T);
+    addDependency<U>(metaProp: MetaProperty<U>, precedence: number, callback: (value: U, input: T) => T): MetaProperty<T>;
     addSideEffect<U>(metaProp: MetaProperty<U>, precedence: number, callback: (value: T, input: U) => U): MetaProperty<T>;
     getDecorator(value: T): {
         (_target: any, context: DecoratorContext): void;
@@ -29,11 +30,12 @@ export declare class MetaPropReader {
      * @param obj - instance or constructor of the class to which this meta property was applied
      * @returns array of key-value pairs
      */
-    entries<T>(metaProp: MetaProperty<T>): [(string | symbol), T][];
+    entries<T>(metaProp: MetaProperty<T>): [(string | symbol), NonNullable<T>][];
     list<T>(metaProp: MetaProperty<T>): (string | symbol)[];
 }
 export type Constructor<T = object> = new (...args: any[]) => T;
 type MetaPropCondition = (context: {
     [k: string]: any;
 }) => boolean;
+export declare const defaultProp: MetaProperty<any>;
 export {};
