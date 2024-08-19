@@ -47,6 +47,10 @@ export class SpreadsheetClient {
         return promise;
     }
 
+    getName(): string | undefined {
+        return this.name;
+    }
+
     getSheet(
         sheet?: string | { name?: string, id?: number },
         orientation: Orientation = 'normal',
