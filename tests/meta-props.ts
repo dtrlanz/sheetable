@@ -249,3 +249,118 @@ test('side effects', t => {
     t.is(zygomorphic.get(A, 'b'), 2000);    // implicit: peripatetic 2 -> zygomorphic 2000
     t.is(zygomorphic.get(A, 'c'), 1);       // explicit
 });
+
+test.only('apply dynamically', t => {
+    const palatableProp = new MetaProperty<string | undefined>('palatable', undefined);
+    const palatable = palatableProp.getDecorator('🍕');
+    const pReader = {
+        get(obj: object | Constructor, key?: string | symbol) {
+            return new MetaPropReader(obj).get(palatableProp, key);
+        },
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj).entries(palatableProp);
+        },
+    }
+
+    const laudableProp = new MetaProperty<string | undefined>('laudable', undefined);
+    function laudable(value: string) {
+        return laudableProp.getDecorator(value);
+    }
+    const lReader = {
+        get(obj: object | Constructor, key?: string | symbol) {
+            return new MetaPropReader(obj).get(laudableProp, key);
+        },
+        entries(obj: object | Constructor) {
+            return new MetaPropReader(obj).entries(laudableProp);
+        },
+    }
+
+    // set meta props
+    //@palatable
+    class ClassA {
+        //@laudable('very good')
+        foo: string = 'abc';
+
+        //@palatable
+        //@laudable('brilliant')
+        accessor bar: number = 42;
+    }
+
+    laudableProp.apply(ClassA, 'foo', 'very good');
+    palatableProp.apply(ClassA, 'bar', '🍕');
+    laudableProp.apply(ClassA, 'bar', 'brilliant');
+    palatableProp.apply(ClassA, undefined, '🍕');
+
+    // retrieve meta prop via class
+    t.is(pReader.get(ClassA), '🍕');
+    t.is(pReader.get(ClassA, 'foo'), undefined);
+    t.is(pReader.get(ClassA, 'bar'), '🍕');
+    t.deepEqual(pReader.entries(ClassA), [['bar', '🍕']]);
+
+    t.is(lReader.get(ClassA), undefined);
+    t.is(lReader.get(ClassA, 'foo'), 'very good');
+    t.is(lReader.get(ClassA, 'bar'), 'brilliant');
+    t.deepEqual(lReader.entries(ClassA), [['foo', 'very good'], ['bar', 'brilliant']]);
+
+    // subclass inherits meta props
+    class ClassB extends ClassA {}
+
+    t.is(pReader.get(ClassB), '🍕');
+    t.is(pReader.get(ClassB, 'foo'), undefined);
+    t.is(pReader.get(ClassB, 'bar'), '🍕');
+    t.deepEqual(pReader.entries(ClassB), [['bar', '🍕']])
+
+    t.is(lReader.get(ClassB), undefined);
+    t.is(lReader.get(ClassB, 'foo'), 'very good');
+    t.is(lReader.get(ClassB, 'bar'), 'brilliant');
+    t.deepEqual(lReader.entries(ClassB), [['foo', 'very good'], ['bar', 'brilliant']]);
+
+    // subclass can shadow superclass meta props
+    //@laudable('magnificent')
+    class ClassC extends ClassB {
+        //@palatable
+        //@laudable('not bad')
+        foo = 'def';
+
+        //@palatable
+        baz = true;
+    }
+
+    laudableProp.apply(ClassC, undefined, 'magnificent');
+    palatableProp.apply(ClassC, 'foo', '🍕');
+    laudableProp.apply(ClassC, 'foo', 'not bad');
+    palatableProp.apply(ClassC, 'baz', '🍕');
+
+    t.is(pReader.get(ClassC), '🍕');
+    t.is(pReader.get(ClassC, 'foo'), '🍕');
+    t.is(pReader.get(ClassC, 'bar'), '🍕');
+    t.is(pReader.get(ClassC, 'baz'), '🍕');
+    t.deepEqual(pReader.entries(ClassC), [['foo', '🍕'], ['bar', '🍕'], ['baz', '🍕']]);
+
+    t.is(lReader.get(ClassC), 'magnificent');
+    t.is(lReader.get(ClassC, 'foo'), 'not bad');
+    t.is(lReader.get(ClassC, 'bar'), 'brilliant');
+    t.is(lReader.get(ClassC, 'baz'), undefined);
+    t.deepEqual(lReader.entries(ClassC), [['foo', 'not bad'], ['bar', 'brilliant']]);
+
+    // superclass meta props are unchanged
+    t.is(pReader.get(ClassA), '🍕');
+    t.is(pReader.get(ClassA, 'foo'), undefined);
+    t.is(pReader.get(ClassA, 'bar'), '🍕');
+    t.deepEqual(pReader.entries(ClassA), [['bar', '🍕']])
+
+    t.is(lReader.get(ClassA), undefined);
+    t.is(lReader.get(ClassA, 'foo'), 'very good');
+    t.is(lReader.get(ClassA, 'bar'), 'brilliant');
+    t.deepEqual(lReader.entries(ClassA), [['foo', 'very good'], ['bar', 'brilliant']]);
+
+    t.is(pReader.get(ClassB), '🍕');
+    t.is(pReader.get(ClassB, 'foo'), undefined);
+    t.is(pReader.get(ClassB, 'bar'), '🍕');
+    t.deepEqual(pReader.entries(ClassB), [['bar', '🍕']])
+
+    t.is(lReader.get(ClassB), undefined);
+    t.is(lReader.get(ClassB, 'foo'), 'very good');
+    t.is(lReader.get(ClassB, 'bar'), 'brilliant');
+    t.deepEqual(lReader.entries(ClassB), [['foo', 'very good'], ['bar', 'brilliant']]);
+});

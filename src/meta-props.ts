@@ -55,45 +55,67 @@ export class MetaProperty<T> {
         return decorator;
 
         function updateMetadata({ metadata, name, kind }: DecoratorContext, value: T, condition?: MetaPropCondition) {
-            let decoratedProps = metadata[metadataKey] as Map<string | symbol | undefined, Map<MetaProperty<any>, MetaPropRecord<any>>> | undefined;
-            if (!decoratedProps || !Object.hasOwn(metadata, metadataKey)) {
-                const superDecoratedProps = decoratedProps
-                metadata[metadataKey] = decoratedProps = new Map();
-                if (superDecoratedProps) {
-                    // inherit from superclass
-                    for (const [propKey, propMetaProps] of superDecoratedProps) {
-                        const copy: typeof propMetaProps = new Map();
-                        for (const [metaPropKey, metaPropRecord] of propMetaProps) {
-                            // clone to avoid modifying superclass metadata
-                            copy.set(metaPropKey, {
-                                value: metaPropRecord.value,
-                                conditional: [...metaPropRecord.conditional],
-                            })
-                        }
-                        decoratedProps.set(propKey, copy);
-                    }
-                }
-            }
             if (kind === 'class') {
                 // store all class decorator value under `undefined` to distinguish them from 
                 // member decorator values
                 name = undefined;
             }
-            let propMetaProps = decoratedProps.get(name);
-            if (!propMetaProps) {
-                decoratedProps.set(name, propMetaProps = new Map());
-            }
-            let entry = propMetaProps.get(metaProp);
-            if (!entry) {
-                propMetaProps!.set(metaProp, entry = { conditional: [] });
-            }
-            if (condition) {
-                entry.conditional.push({ value, condition });
-            } else {
-                entry.value = value;
-            }
-        }        
+            metaProp.updateMetadata(metadata, name, value, condition);
+        }
     }
+
+    private updateMetadata(metadata: DecoratorMetadataObject, key: string | symbol | undefined, value: T, condition?: MetaPropCondition) {
+        let decoratedProps = metadata[metadataKey] as Map<string | symbol | undefined, Map<MetaProperty<any>, MetaPropRecord<any>>> | undefined;
+        if (!decoratedProps || !Object.hasOwn(metadata, metadataKey)) {
+            const superDecoratedProps = decoratedProps
+            metadata[metadataKey] = decoratedProps = new Map();
+            if (superDecoratedProps) {
+                // inherit from superclass
+                for (const [propKey, propMetaProps] of superDecoratedProps) {
+                    const copy: typeof propMetaProps = new Map();
+                    for (const [metaPropKey, metaPropRecord] of propMetaProps) {
+                        // clone to avoid modifying superclass metadata
+                        copy.set(metaPropKey, {
+                            value: metaPropRecord.value,
+                            conditional: [...metaPropRecord.conditional],
+                        })
+                    }
+                    decoratedProps.set(propKey, copy);
+                }
+            }
+        }
+        let propMetaProps = decoratedProps.get(key);
+        if (!propMetaProps) {
+            decoratedProps.set(key, propMetaProps = new Map());
+        }
+        let entry = propMetaProps.get(this);
+        if (!entry) {
+            propMetaProps!.set(this, entry = { conditional: [] });
+        }
+        if (condition) {
+            entry.conditional.push({ value, condition });
+        } else {
+            entry.value = value;
+        }
+    }    
+
+    apply(ctor: Constructor, key: string | symbol | undefined, value: T, condition?: MetaPropCondition) {
+        let metadata: DecoratorMetadataObject | undefined;
+        if (Object.hasOwn(ctor, Symbol.metadata)) {
+            metadata = ctor[Symbol.metadata] as DecoratorMetadataObject;
+        } else {
+            let base = Object.getPrototypeOf(ctor.prototype)?.constructor;
+            let baseMetadata: DecoratorMetadataObject | null = null;
+            while (base && !baseMetadata) {
+                baseMetadata = base[Symbol.metadata] ?? null;
+                base = Object.getPrototypeOf(base.prototype)?.constructor;
+            }
+            metadata = Object.create(baseMetadata) as DecoratorMetadataObject;
+            ctor[Symbol.metadata] = metadata;
+        }
+        this.updateMetadata(metadata, key, value, condition);
+    }
+    
 }
 
 const getValue = Symbol('get value');

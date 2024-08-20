@@ -13,6 +13,8 @@ export declare class MetaProperty<T> {
         (_target: any, context: DecoratorContext): void;
         where(condition: MetaPropCondition): (_target: any, context: DecoratorContext) => void;
     };
+    private updateMetadata;
+    apply(ctor: Constructor, key: string | symbol | undefined, value: T, condition?: MetaPropCondition): void;
 }
 export declare class MetaPropReader {
     private ctor;
