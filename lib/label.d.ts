@@ -1,4 +1,5 @@
-import { Constructor } from "./meta-props.js";
+import { MetaProperty, Constructor } from "./meta-props.js";
+export declare const labelProp: MetaProperty<string | string[] | undefined>;
 export declare const spread: {
     (_target: any, context: DecoratorContext): void;
     where(condition: (context: {

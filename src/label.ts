@@ -3,7 +3,7 @@ import { MetaProperty, Constructor, MetaPropReader } from "./meta-props.js";
 import { createFromEntries, getPropConstructor } from "./type.js";
 import { isScalar } from "./values.js";
 
-const labelProp = new MetaProperty<string | string[] | undefined>('label', undefined);
+export const labelProp = new MetaProperty<string | string[] | undefined>('label', undefined);
 const spreadProp = new MetaProperty<boolean>('spread', false);
 const restProp = new MetaProperty<boolean>('rest', false);
 
@@ -207,7 +207,8 @@ export function getObjectPath(label: string[], obj: object | Constructor, contex
             // No match found.
             if (!found) {
                 // If unmatched labels should be retained, default to using label as key.
-                return includeRest ? label : undefined;
+                if (!includeRest) return undefined;
+                found = { key: label[0] };
             }
         }
     }

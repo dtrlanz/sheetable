@@ -127,6 +127,14 @@ export class Region {
     }
 
     readAll(): Scalar[][] {
+        if (this.rowStart === this.rowStop) return [];
+        if (this.colStart === this.colStop) {
+            const data = [];
+            for (let r = this.rowStart; r < this.rowStop; r++) {
+                data.push([]);
+            }
+            return data;
+        }
         if (this.orientation === 'normal') {
             return this.sheet.getRange(this.rowStart, this.colStart, 
                 this.rowStop - this.rowStart, this.colStop - this.colStart)
@@ -139,6 +147,7 @@ export class Region {
     }
 
     writeAll(data: Scalar[][]) {
+        if (this.rowStart === this.rowStop || this.colStart === this.colStop) return;
         if (this.orientation === 'normal') {
             this.sheet.getRange(this.rowStart, this.colStart, 
                 this.rowStop - this.rowStart, this.colStop - this.colStart)

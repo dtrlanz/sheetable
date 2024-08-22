@@ -58,8 +58,7 @@ export class SpreadsheetClient {
         const { sheetName, sheetId } = getSheetArg(sheet);
         return new SheetClient(
             request => {
-                console.log({ sheetName, sheetId, ...request });
-                return this.request({ sheetName, sheetId, ...request });
+                return this.request({ sheetName, sheetId, orientation, ...request });
             },
             sheetName,
             sheetId,
