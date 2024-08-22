@@ -1,6 +1,6 @@
 import { getIndexKeys } from "./index.js";
 import { MetaProperty, Constructor, MetaPropReader } from "./meta-props.js";
-import { createFromEntries, getPropConstructor } from "./type.js";
+import { createFromEntries, getPropConstructor, typeProp } from "./type.js";
 import { isScalar } from "./values.js";
 
 export const labelProp = new MetaProperty<string | string[] | undefined>('label', undefined);
@@ -196,9 +196,9 @@ export function getObjectPath(label: string[], obj: object | Constructor, contex
                 // exclude properties with array spreading (only interested in object spreading here)
                 if (typeof mpReader.get(labelProp, key) === 'object') continue;
 
-                const nextObj = objOrPrototype[key];
-                if (nextObj && typeof nextObj === 'object') {
-                    const path = getObjectPath(label, nextObj, context, includeRest && key === restKey);
+                const propCtor = getPropConstructor(obj, key, context);
+                if (propCtor && propCtor !== Date) {
+                    const path = getObjectPath(label, propCtor, context, includeRest && key === restKey);
                     if (path) {
                         return [key, ...path];
                     }
@@ -235,7 +235,7 @@ export function getObjectPath(label: string[], obj: object | Constructor, contex
             nextObj = getPropConstructor(obj, key);
         }
         if (nextObj) {
-            const nextPath = getObjectPath(label.slice(1), nextObj, context, false);
+            const nextPath = getObjectPath(label.slice(1), nextObj, context);
             if (nextPath) {
                 tail = nextPath;
             }
