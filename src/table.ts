@@ -26,6 +26,7 @@ type TableOptions = {
 
 type Slot<T> = { 
     idx: number, 
+    idxValues: any[],
     row: number, 
     changed: number,
     cached?: T,
@@ -47,7 +48,6 @@ export class Table<T extends object> {
     #lastSaved?: Date;
     get lastSaved() { return this.#lastSaved }
     
-
     private constructor(
         ctor: Constructor<T>,
         context: { readonly [k: string]: any },
@@ -94,6 +94,7 @@ export class Table<T extends object> {
                 // increment `idx` only if element is actually initialized
                 const slot = { 
                     idx: table.slots.length, 
+                    idxValues,
                     row, 
                     changed: table.changes.current 
                 };
@@ -154,6 +155,7 @@ export class Table<T extends object> {
                 const slot = { 
                     // increment `idx` only if element is actually initialized
                     idx: table.slots.length, 
+                    idxValues,
                     row, 
                     changed: table.changes.current,
                     cached: table.toCached(obj) 
@@ -181,6 +183,16 @@ export class Table<T extends object> {
         table.save();
 
         return table;
+    }
+
+    get size() {
+        return this.slots.length;
+    }
+
+    *indexValues(): Iterable<any[]> {
+        for (let i = 0; i < this.slots.length; i++) {
+            yield this.slots[i].idxValues;
+        }
     }
 
     async at(idx: number): Promise<T | undefined> {
@@ -226,6 +238,7 @@ export class Table<T extends object> {
         let slot = this.index.init(indexedValues, () => {
             const slot = { 
                 idx: this.slots.length, 
+                idxValues: indexedValues,
                 row: this.rowStop++,
                 changed: this.changes.current,
             };

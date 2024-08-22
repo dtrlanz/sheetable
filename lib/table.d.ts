@@ -35,6 +35,8 @@ export declare class Table<T extends object> {
     static open<T extends object>(ctor: Constructor<T>, options?: TableOptions): Promise<Table<T>>;
     static create<T extends object>(ctor: Constructor<T>, options?: TableOptions): Table<T>;
     static create<T extends object>(data: Iterable<T>, options?: TableOptions): Table<T>;
+    get size(): number;
+    indexValues(): Iterable<any[]>;
     at(idx: number): Promise<T | undefined>;
     /**
      * Retrieves a record based on indexed properties.
