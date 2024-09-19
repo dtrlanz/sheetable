@@ -192,9 +192,9 @@ export class SheetClient {
             undefined,
             orientation,
             rowStart,
-            rowStop ?? sheet.getLastRow() + 1,
+            rowStop,
             colStart,
-            colStop ?? sheet.getLastColumn() + 1,
+            colStop,
         );
     }
 

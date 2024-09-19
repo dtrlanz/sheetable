@@ -1,4 +1,3 @@
-/// <reference types="google-apps-script" />
 import { SheetLike, Orientation } from "./sheet-navigation.js";
 import { Branch } from "./headers.js";
 import { Sendable } from "./values.js";
