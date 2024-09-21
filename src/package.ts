@@ -9,3 +9,4 @@ export * from "./label.js";
 export * from "./type.js";
 export * from "./values.js";
 export * from "./component.js";
+export * from "./control.js";
