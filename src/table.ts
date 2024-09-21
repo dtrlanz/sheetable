@@ -83,6 +83,7 @@ export class Table<T extends object> {
         // Initialize index
         let row = data.rowOffset;
         const frontMatterRowCount = options?.frontMatterRowCount ?? 0;
+        console.log(data);
         for (const idxValues of index.getIndexedPropsFromRows(data.rows, data.colNumbers)) {
             // skip front matter
             if (row < data.rowOffset + frontMatterRowCount) {
@@ -261,7 +262,9 @@ export class Table<T extends object> {
             entries.push([keyTuple, rowData[colIdx]]);
         }
         const obj = createRecursively(Object, entries);
-        if (Array.isArray(obj)) throw new Error(`unexpected array when constructing element`);
+        if (Array.isArray(obj)) throw new Error(`unexpected array when constructing element`, {
+            cause: { input: entries, array: obj }
+        });
         return obj;
     }
 
