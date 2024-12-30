@@ -225,7 +225,7 @@ defaultProp.affectedBy.push({
         if (key) {
             const reader = getMetaPropReader();
             const defaultObj = reader.get(defaultProp);
-            return defaultObj[key];
+            return defaultObj?.[key];
         } else {
             return createFromEntries(ctor, []);
         }

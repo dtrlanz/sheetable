@@ -44,7 +44,7 @@ function wrapControlFactory(controlFactory: (id: string) => HTMLElement | Docume
         }
         const control = withId as FormControl;
         let getValue = () => control.value as any;
-        let setValue = (value: any) => { control.value = `${value}` };
+        let setValue = (value: any) => { control.value = value == undefined ? '' : `${value}` };
         switch (control.type) {
             case 'checkbox':
             case 'radio':

@@ -142,7 +142,7 @@ export function parse(parser: (str: string) => any) {
     return parseProp.getDecorator(parser);
 }
 
-export const stringifyProp = new MetaProperty<(val: any) => string>('stringify', v => `${v}`)
+export const stringifyProp = new MetaProperty<(val: any) => string>('stringify', v => v == undefined ? '' : `${v}`)
     .addDependency(typeProp, 0, (type, toString) => {
         switch (type) {
             case String:
@@ -322,15 +322,16 @@ export function createFromEntries<T>(ctor: Constructor<T>, entries: [string | sy
     }
 
     // Otherwise try calling the constructor with zero args, then setting properties
-    try {
+    //try {
         const obj = new ctor();
         for (const [k, v] of entries) {
             (obj as any)[k] = v;
         }
         return obj;
-    } catch (_) {
-        return undefined;
-    }
+    // } catch (e) {
+    //     console.log(e);
+    //     return undefined;
+    // }
 }
 
 export function createRecursively<T extends object>(
