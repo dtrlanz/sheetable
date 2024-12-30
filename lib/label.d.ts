@@ -1,5 +1,6 @@
 import { MetaProperty, Constructor } from "./meta-props.js";
 export declare const labelProp: MetaProperty<string | string[] | undefined>;
+export declare const scalarProp: MetaProperty<boolean>;
 export declare const spread: {
     (_target: any, context: DecoratorContext): void;
     where(condition: (context: {
@@ -7,6 +8,12 @@ export declare const spread: {
     }) => boolean): (_target: any, context: DecoratorContext) => void;
 };
 export declare const rest: {
+    (_target: any, context: DecoratorContext): void;
+    where(condition: (context: {
+        [k: string]: any;
+    }) => boolean): (_target: any, context: DecoratorContext) => void;
+};
+export declare const scalar: {
     (_target: any, context: DecoratorContext): void;
     where(condition: (context: {
         [k: string]: any;

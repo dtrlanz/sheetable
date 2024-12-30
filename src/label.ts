@@ -6,9 +6,11 @@ import { isScalar } from "./values.js";
 export const labelProp = new MetaProperty<string | string[] | undefined>('label', undefined);
 const spreadProp = new MetaProperty<boolean>('spread', false);
 const restProp = new MetaProperty<boolean>('rest', false);
+export const scalarProp = new MetaProperty<boolean>('scalar', false);
 
 export const spread = spreadProp.getDecorator(true);
 export const rest = restProp.getDecorator(true);
+export const scalar = scalarProp.getDecorator(true);
 
 export function label(label: string, ...rest: string[]) {
     if (rest.length === 0) {
@@ -24,6 +26,7 @@ export function getKeysWithLabels(obj: object, context?: { [k: string]: any }, i
     const mpReader = new MetaPropReader(ctor, context);
     const toBeSpread = new Set(mpReader.list(spreadProp));
     const restList = mpReader.list(restProp);
+    const scalarLike = new Set(mpReader.list(scalarProp));
     if (restList.length > 1) throw new Error('only one member can be annoted with @rest');
     const restKey = restList.at(0);
 
@@ -46,7 +49,7 @@ export function getKeysWithLabels(obj: object, context?: { [k: string]: any }, i
         // and none of the other properties are decorated with @rest.
         if (!(key in sample || (includeRest && restKey === undefined))) continue;
 
-        if (!isScalar(value)) {
+        if (!(isScalar(value) || scalarLike.has(key))) {
             // Complex types (i.e., objects incl. arrays)
             if (typeof value === 'function') {
                 // functions not supported
