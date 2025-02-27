@@ -344,7 +344,6 @@ export class Table<T extends object> {
         // Collect data changed since last successful save
         let arr: (T | undefined)[] | undefined;
         let firstRow = 0, lastRow = 0;
-        this.changes.current++;
         const timeLastSaved = new Date();
         for (const s of this.slots) {
             if (changesOnly && s.changed <= this.changes.saved) {
@@ -358,14 +357,14 @@ export class Table<T extends object> {
             }
         }
         // Save to sheet
+        const milestone = this.changes.current++;
         if (!arr) return;
         await this.client.writeRows(firstRow, 
             arr.slice(0, lastRow - firstRow + 1)
             .map(r => r ? this.header.getRowValues(r) : undefined)
         );
         // Update status
-        this.changes.saved = this.changes.current;
-        this.changes.current++;
+        this.changes.saved = milestone;
         this.#lastSaved = timeLastSaved;
     }
 

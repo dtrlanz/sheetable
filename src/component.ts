@@ -263,7 +263,7 @@ class UiField {
         let key: string | symbol | number = 'data';
         let keyStr = '';
         for (let i = 0; i < keyTuple.length; i++) {
-            obj = obj[key];
+            obj = obj[key] ?? {};
             key = keyTuple[i];
             // Assemble string representation of key tuple. (This is not used by sheetable but 
             // may be used by the app.)
